@@ -1,5 +1,5 @@
-// GitHub 机器人自动同步时间: 2026-05-14 21:49:47
-const GRID_UP_TIME = '2026-05-14 21:49:47';
+// GitHub 机器人自动同步时间: 2026-05-14 21:50:25
+const GRID_UP_TIME = '2026-05-14 21:50:25';
 const GRID_INFO = {
     "1": {
         "status": "未认领",
@@ -69,7 +69,7 @@ const GRID_INFO = {
         "investigator": "崔润田",
         "inv2026": "崔润田",
         "rec2026": "李鸿",
-        "date": ""
+        "date": "2026年5月23日"
     },
     "11": {
         "status": "未认领",
@@ -328,7 +328,7 @@ const GRID_INFO = {
         "investigator": "刘瑾青",
         "inv2026": "",
         "rec2026": "",
-        "date": ""
+        "date": "2026年5月20日"
     },
     "48": {
         "status": "未认领",
@@ -454,7 +454,7 @@ const GRID_INFO = {
         "investigator": "",
         "inv2026": "刘韵莉",
         "rec2026": "汤立群",
-        "date": ""
+        "date": "2026年5月16日"
     },
     "66": {
         "status": "未认领",
@@ -489,7 +489,7 @@ const GRID_INFO = {
         "investigator": "",
         "inv2026": "窦婷",
         "rec2026": "郭倩文",
-        "date": ""
+        "date": "2026年5月22日"
     },
     "71": {
         "status": "已完成",
@@ -538,7 +538,7 @@ const GRID_INFO = {
         "investigator": "",
         "inv2026": "黎雨葳",
         "rec2026": "赵楚君",
-        "date": ""
+        "date": "2026年5月17日"
     },
     "78": {
         "status": "未认领",
