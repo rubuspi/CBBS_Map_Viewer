@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CBBS样点与网格双引擎渲染系统</title>
+    <title>CBBS样点与网格渲染工具</title>
     
     <!-- 引入 Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -54,7 +54,6 @@
 
         .amap-maptype { display: block !important; }
         
-        /* 气泡关闭按钮 */
         .custom-close-btn {
             position: absolute; right: 6px; top: 6px; width: 18px; height: 18px;
             background: #eee; color: #666; border-radius: 50%; text-align: center;
@@ -62,7 +61,6 @@
         }
         .custom-close-btn:hover { background: #ff4d4f; color: white; }
 
-        /* 图例面板 */
         #legend-panel {
             position: absolute; bottom: 40px; right: 20px; z-index: 999;
             background: rgba(255, 255, 255, 0.95); padding: 15px 18px; border-radius: 6px;
@@ -88,7 +86,6 @@
         .leaflet-popup-tip-container { display: none !important; }
         .leaflet-custom-popup .leaflet-popup-content { margin: 0 !important; width: auto !important; }
 
-        /* 🌟 新增：鼠标悬停小提示框样式 🌟 */
         .hover-tooltip {
             background: rgba(0, 0, 0, 0.75) !important; color: #fff !important;
             padding: 4px 8px !important; border-radius: 4px !important;
@@ -111,7 +108,7 @@
     <div id="sidebar">
         <div id="toggle-btn" title="收起/展开面板">◀</div>
         
-        <h3>CBBS 多引擎渲染系统 <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 50 10 C 20 10 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 10 50 10 Z' fill='%2387CEEB'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cellipse cx='75' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%235CACEE'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%235CACEE'/%3E%3C/svg%3E" style="width:20px; height:20px;"></h3>
+        <h3>CBBS 网格 & 样点渲染工具 <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 50 10 C 20 10 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 10 50 10 Z' fill='%2387CEEB'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cellipse cx='75' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%235CACEE'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%235CACEE'/%3E%3C/svg%3E" style="width:20px; height:20px;"></h3>
         
         <div class="engine-switch">
             <label><input type="radio" name="engine" value="osm" checked> 🌍 开源地图 (免Key)</label>
@@ -150,7 +147,8 @@
         <div id="amap-container" class="map-layer"></div>
 
         <div id="legend-panel">
-            <div style="font-weight:bold; margin-bottom:12px; text-align:center; font-size:14px; color:#333; border-bottom:1px solid #ddd; padding-bottom:6px;">📊 网格状态看板</div>
+            <div style="font-weight:bold; text-align:center; font-size:14px; color:#333; padding-bottom:4px;">📊 网格状态看板</div>
+            <div id="update-time-display" style="text-align:center; font-size:11px; color:#999; margin-bottom:12px; border-bottom:1px solid #ddd; padding-bottom:6px;">更新时间: 正在获取...</div>
             
             <div class="legend-item" title="已完成(2025已调查) + 已完成(2025未调查)">
                 <div class="legend-color" style="background:rgba(82, 196, 26, 0.2); border-color:#52c41a;"></div>
@@ -166,13 +164,13 @@
             
             <div class="legend-item">
                 <div class="legend-color" style="background:rgba(24, 144, 255, 0.2); border-color:#1890ff;"></div>
-                <span style="color:#1890ff;">未认领 (2025已调查):</span>
+                <span style="color:#1890ff;">未认领(25年已调查):</span>
                 <span class="count-badge" id="count-unclaimed-has" style="color:#1890ff;">0</span>
             </div>
             
             <div class="legend-item">
                 <div class="legend-color" style="background:rgba(245, 34, 45, 0.2); border-color:#f5222d;"></div>
-                <span style="color:#f5222d;">未认领 (2025未调查):</span>
+                <span style="color:#f5222d;">未认领(25年未调查):</span>
                 <span class="count-badge" id="count-unclaimed-none" style="color:#f5222d;">0</span>
             </div>
 
@@ -212,6 +210,14 @@
             document.getElementById('count-todo').innerText = `${todoHas2025} + ${todoNo2025}`;
             document.getElementById('count-unclaimed-has').innerText = unclaimHas2025;
             document.getElementById('count-unclaimed-none').innerText = unclaimNo2025;
+
+            // 🌟 读取并显示你在外部文件中定义的更新时间
+            const timeDisplay = document.getElementById('update-time-display');
+            if (typeof GRID_UP_TIME !== 'undefined') {
+                timeDisplay.innerText = `更新时间: ${GRID_UP_TIME}`;
+            } else {
+                timeDisplay.innerText = `更新时间: 暂无数据`;
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -284,6 +290,10 @@
                 const engine = document.querySelector('input[name="engine"]:checked').value;
                 const text = dataInput.value.trim();
                 
+                if (!text || text === FALLBACK_POINTS_WGS84) {
+                    return alert("请输入或粘贴真实的点位URL数据！");
+                }
+
                 if (window.innerWidth <= 768) {
                     sidebar.classList.add('collapsed');
                     document.getElementById('toggle-btn').innerText = '▶';
@@ -297,24 +307,34 @@
             });
 
             // ==========================================
-            // 引擎 1：开源 Leaflet
+            // 引擎 1：开源 Leaflet (CartoDB 默认 + OSM 备用)
             // ==========================================
             let lMarkers = L.featureGroup(), lPolygons = L.featureGroup(), lLabels = L.featureGroup();
 
             function renderLeaflet(text) {
                 if (!window.leafletInstance) {
-                    window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5 }).setView([23.1291, 113.2644], 10);
+                    //window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5 }).setView([23.1291, 113.2644], 10);
+                    window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
+                    
+                    // 🌟 更换 CartoDB 高速街道图作为默认底图
+                    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' });
+                    // OSM 作为备用
                     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+                    
                     const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
                     const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
                     const esriRoads = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
                     
                     const satelliteWithLabels = L.layerGroup([esriSatellite, esriLabels]);
-                    satelliteWithLabels.addTo(window.leafletInstance); 
                     
+                    // 默认开启 Carto
+                    cartoLayer.addTo(window.leafletInstance); 
+
                     L.control.layers(
-                        { "🗺️ 标准街道图 (OSM)": osmLayer, "🛰️ 高清卫星图 (Esri)": satelliteWithLabels }, 
-                        { "🛣️ 显示交通路网 (Esri)": esriRoads }, { collapsed: false }
+                        { "🗺️ Carto标准图": cartoLayer, "🗺️ OSM标准图": osmLayer, "🛰️ Esri卫星图": satelliteWithLabels },
+                        { "🛣️ Esri路网": esriRoads, 
+                          [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:4px; margin-top:-2px;"> 样点图标`]: lMarkers },
+                        { collapsed: false }
                     ).addTo(window.leafletInstance);
 
                     window.leafletInstance.on('zoomend', function() {
@@ -331,6 +351,7 @@
                 }
 
                 lMarkers.clearLayers(); lPolygons.clearLayers(); lLabels.clearLayers();
+
                 const leafGridData = typeof GRID_DATA_WGS84 !== 'undefined' ? GRID_DATA_WGS84 : (typeof GRID_DATA !== 'undefined' ? GRID_DATA : null);
 
                 if (leafGridData && leafGridData.length > 0) {
@@ -342,21 +363,26 @@
                             else if (info.status === '待调查') { sColor = fColor = '#fa8c16'; sText = '⏳ 待调查'; } 
                             else if (info.status === '未认领') {
                                 if (info.investigator && info.investigator !== '无' && info.investigator.trim() !== '') { 
-                                    sColor = fColor = '#1890ff'; sText = '📝 未认领(2025已调查)'; 
-                                } else { sColor = fColor = '#f5222d'; sText = '⚠️ 未认领'; }
+                                    sColor = fColor = '#1890ff'; sText = '📝 未认领(2025年已调查)'; 
+                                } else { 
+                                    sColor = fColor = '#f5222d'; sText = '⚠️ 未认领(2025年未调查)'; 
+                                }
                             }
                         }
 
                         let firstCenter = null;
-                        const gridPopup = L.popup({ closeButton: false, className: 'leaflet-custom-popup', maxWidth: 300 }).setContent(generateGridPopupHtml(grid.name, sColor, sText, info));
+                        const gridPopup = L.popup({ closeButton: false, className: 'leaflet-custom-popup', maxWidth: 300 })
+                                           .setContent(generateGridPopupHtml(grid.name, sColor, sText, info));
 
                         grid.polygons.forEach((polyPath, idx) => {
                             let leafletPaths = polyPath.map(ring => ring.map(pt => [pt[1], pt[0]]));
                             const polygon = L.polygon(leafletPaths, { color: sColor, weight: 2, fillColor: fColor, fillOpacity: 0.15 });
+                            
                             polygon.on('click', (e) => {
                                 if (window.leafletInstance.hasLayer(gridPopup)) window.leafletInstance.closePopup(gridPopup);
                                 else gridPopup.setLatLng(e.latlng).openOn(window.leafletInstance);
                             });
+                            
                             lPolygons.addLayer(polygon);
                             if (idx === 0) firstCenter = polygon.getBounds().getCenter();
                         });
@@ -384,10 +410,10 @@
                         const lat = parseFloat(match[2]).toFixed(6);
                         const name = decodeURIComponent(match[3]);
                         
-                        const ptPopup = L.popup({ closeButton: false, className: 'leaflet-custom-popup' }).setContent(generatePointPopupHtml(name, lng, lat));
+                        const ptPopup = L.popup({ closeButton: false, className: 'leaflet-custom-popup' })
+                                         .setContent(generatePointPopupHtml(name, lng, lat));
+
                         const marker = L.marker([lat, lng], {icon: birdIcon});
-                        
-                        // 🌟 核心新增：鼠标悬停小提示框 🌟
                         marker.bindTooltip(`<div class="hover-tooltip">${name}</div>`, { direction: 'top', offset: [0, -size/2], className: 'hover-tooltip', opacity: 1 });
 
                         marker.on('click', () => {
@@ -440,8 +466,6 @@
                 if (!window.amapInstance) {
                     window.amapInstance = new window.AMap.Map('amap-container', { zoom: 10, center: [113.2644, 23.1291] });
                     window.amapInstance.addControl(new window.AMap.MapType({ defaultType: 1, showTraffic: false, showRoad: false }));
-                    
-                    // 🌟 初始化高德悬停小提示窗 🌟
                     window.amapHoverWin = new window.AMap.InfoWindow({ isCustom: true, autoMove: false, retainWhenClose: true });
 
                     window.amapInstance.on('zoomchange', () => {
@@ -510,7 +534,6 @@
                         const ptInfoWin = new window.AMap.InfoWindow({ isCustom: true, content: generatePointPopupHtml(name, lng, lat), offset: new window.AMap.Pixel(0, -size) });
                         const marker = new window.AMap.Marker({ position: [lng, lat], icon: cuteBirdIcon, offset: new window.AMap.Pixel(-size/2, -size), map: window.amapInstance });
                         
-                        // 🌟 核心新增：高德鼠标悬停小提示框 🌟
                         marker.on('mouseover', () => {
                             if (!ptInfoWin.getIsOpen()) {
                                 window.amapHoverWin.setContent(`<div class="hover-tooltip">${name}</div>`);
@@ -521,7 +544,7 @@
                         marker.on('mouseout', () => window.amapHoverWin.close());
 
                         marker.on('click', () => {
-                            window.amapHoverWin.close(); // 点击时先关掉悬停提示
+                            window.amapHoverWin.close(); 
                             if(ptInfoWin.getIsOpen()) ptInfoWin.close(); else ptInfoWin.open(window.amapInstance, marker.getPosition());
                         });
                         aMarkers.push(marker);
