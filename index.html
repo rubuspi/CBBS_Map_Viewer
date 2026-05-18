@@ -197,7 +197,7 @@
             
             Object.values(GRID_INFO).forEach(info => {
                 const status = info.status;
-                const hasInv2025 = info.investigator && info.investigator !== "无" && info.investigator.trim() !== "";
+                const hasInv2025 = info.inv2025 && info.inv2025 !== "无" && info.inv2025.trim() !== "";
                 if (status === '已完成' || status === '已调查') {
                     if (hasInv2025) doneHas2025++; else doneNo2025++;
                 } else if (status === '待调查') {
@@ -249,7 +249,7 @@
             window.leafletInstance = null;
 
             function generateGridPopupHtml(title, sColor, sText, info) {
-                let inv2025 = info ? (info.investigator || "无") : "无";
+                let inv2025 = info ? (info.inv2025 || "无") : "无";
                 let inv2026 = info ? (info.inv2026 || "无") : "无";
                 let rec2026 = info ? (info.rec2026 || "无") : "无";
                 let date = info ? (info.date || "") : "";
@@ -362,7 +362,7 @@
                             if (info.status === '已完成' || info.status === '已调查') { sColor = fColor = '#52c41a'; sText = '✅ 已完成'; } 
                             else if (info.status === '待调查') { sColor = fColor = '#fa8c16'; sText = '⏳ 待调查'; } 
                             else if (info.status === '未认领') {
-                                if (info.investigator && info.investigator !== '无' && info.investigator.trim() !== '') { 
+                                if (info.inv2025 && info.inv2025 !== '无' && info.inv2025.trim() !== '') { 
                                     sColor = fColor = '#1890ff'; sText = '📝 未认领(2025年已调查)'; 
                                 } else { 
                                     sColor = fColor = '#f5222d'; sText = '⚠️ 未认领(2025年未调查)'; 
@@ -489,7 +489,7 @@
                             if (info.status === '已完成' || info.status === '已调查') { sColor = fColor = '#52c41a'; sText = '✅ 已完成'; } 
                             else if (info.status === '待调查') { sColor = fColor = '#fa8c16'; sText = '⏳ 待调查'; } 
                             else if (info.status === '未认领') {
-                                if (info.investigator && info.investigator !== '无' && info.investigator.trim() !== '') { 
+                                if (info.inv2025 && info.inv2025 !== '无' && info.inv2025.trim() !== '') { 
                                     sColor = fColor = '#1890ff'; sText = '📝 未认领(已有调查员)'; 
                                 } else { sColor = fColor = '#f5222d'; sText = '⚠️ 未认领'; }
                             }
