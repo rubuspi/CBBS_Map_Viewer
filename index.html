@@ -574,82 +574,81 @@
             });
 
             // ==========================================
-            // 🌟 纯前端：生成并下载 KML 文件逻辑 (完美兼容 iOS 苹果手机版两步路)
+            // 🌟 纯前端：生成并下载 KML 文件逻辑 (完美对标原版规范)
             // ==========================================
             document.getElementById('download-kml-btn').addEventListener('click', () => {
                 if (typeof GRID_DATA_WGS84 === 'undefined' || GRID_DATA_WGS84.length === 0) {
                     return alert("未找到 WGS84 网格数据，无法生成 KML！");
                 }
 
-                let kmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name><![CDATA[CBBS野外状态图]]></name>\n`;
+                let kmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n  <name>CBBS野外调查图</name>\n`;
 
-                // 生成网格与标签
+                // 1. 生成网格与中心点标签
                 GRID_DATA_WGS84.forEach(grid => {
                     const info = typeof GRID_INFO !== 'undefined' ? GRID_INFO[grid.name] : null;
-                    let emoji = "❔";
-                    let polyColor = "40cc3299";
-                    let lineColor = "ffcc3299";
+                    let emoji = "❔", polyColor = "40cc3299", lineColor = "ffcc3299";
 
                     if (info) {
                         const status = info.status;
                         const inv25 = info.inv2025 || info.investigator || "";
                         const hasInv2025 = inv25 && inv25 !== "无" && inv25.trim() !== "";
 
-                        if (status === '已完成' || status === '已调查') {
-                            emoji = "✅"; polyColor = "4052c41a"; lineColor = "ff52c41a";
-                        } else if (status === '待调查') {
-                            emoji = "⏳"; polyColor = "40168cfa"; lineColor = "ff168cfa";
-                        } else if (status === '未认领') {
-                            if (hasInv2025) {
-                                emoji = "📝"; polyColor = "40ff9018"; lineColor = "ffff9018";
-                            } else {
-                                emoji = "⚠️"; polyColor = "402d22f5"; lineColor = "ff2d22f5";
-                            }
+                        if (status === '已完成' || status === '已调查') { emoji = "✅"; polyColor = "4052c41a"; lineColor = "ff52c41a"; }
+                        else if (status === '待调查') { emoji = "⏳"; polyColor = "40168cfa"; lineColor = "ff168cfa"; }
+                        else if (status === '未认领') {
+                            if (hasInv2025) { emoji = "📝"; polyColor = "40ff9018"; lineColor = "ffff9018"; }
+                            else { emoji = "⚠️"; polyColor = "402d22f5"; lineColor = "ff2d22f5"; }
                         }
                     }
 
                     let lngList = [], latList = [];
 
+                    // 渲染多边形
                     grid.polygons.forEach((polyPath, pIdx) => {
-                        kmlContent += `    <Placemark>\n      <name><![CDATA[${grid.name}_区域_${pIdx}]]></name>\n`;
-                        kmlContent += `      <Style><LineStyle><color>${lineColor}</color><width>3</width></LineStyle><PolyStyle><color>${polyColor}</color></PolyStyle></Style>\n`;
-                        kmlContent += `      <Polygon>\n`;
+                        kmlContent += `  <Placemark>\n    <name>${grid.name}_面_${pIdx}</name>\n`;
+                        kmlContent += `    <Style>\n      <LineStyle><color>${lineColor}</color><width>2</width></LineStyle>\n      <PolyStyle><color>${polyColor}</color></PolyStyle>\n    </Style>\n`;
+                        kmlContent += `    <Polygon>\n      <tessellate>1</tessellate>\n`; // 增加 tessellate 贴地显示
 
                         polyPath.forEach((ring, rIdx) => {
                             const coordsStr = ring.map(pt => `${pt[0]},${pt[1]},0`).join(' ');
                             if (rIdx === 0) {
-                                kmlContent += `        <outerBoundaryIs><LinearRing><coordinates>\n          ${coordsStr}\n        </coordinates></LinearRing></outerBoundaryIs>\n`;
+                                kmlContent += `      <outerBoundaryIs><LinearRing><coordinates>${coordsStr}</coordinates></LinearRing></outerBoundaryIs>\n`;
                             } else {
-                                kmlContent += `        <innerBoundaryIs><LinearRing><coordinates>\n          ${coordsStr}\n        </coordinates></LinearRing></innerBoundaryIs>\n`;
+                                kmlContent += `      <innerBoundaryIs><LinearRing><coordinates>${coordsStr}</coordinates></LinearRing></innerBoundaryIs>\n`;
                             }
                             ring.forEach(pt => { lngList.push(pt[0]); latList.push(pt[1]); });
                         });
-
-                        kmlContent += `      </Polygon>\n    </Placemark>\n`;
+                        kmlContent += `    </Polygon>\n  </Placemark>\n`;
                     });
 
-                    // 🌟 修复 iOS 不显示文字的元凶：彻底删掉外部 <Icon> 图片请求，只用 scale=0 隐藏系统图标！
+                    // 渲染网格隐形编号 (修复：补全Icon和hotSpot规范，设scale为0隐藏图标)
                     if (grid.name !== '未命名' && grid.name !== '未命名网格' && grid.name !== '边缘网格' && lngList.length > 0) {
                         const cLng = (lngList.reduce((a, b) => a + b, 0) / lngList.length).toFixed(6);
                         const cLat = (latList.reduce((a, b) => a + b, 0) / latList.length).toFixed(6);
-                        kmlContent += `    <Placemark>\n      <name><![CDATA[${emoji} ${grid.name}]]></name>\n`;
-                        kmlContent += `      <Style><IconStyle><scale>0</scale></IconStyle><LabelStyle><scale>1.2</scale></LabelStyle></Style>\n`;
-                        kmlContent += `      <Point>\n        <coordinates>${cLng},${cLat},0</coordinates>\n      </Point>\n    </Placemark>\n`;
+                        kmlContent += `  <Placemark>\n    <name>${emoji} ${grid.name}</name>\n`;
+                        kmlContent += `    <Style>\n      <IconStyle>\n        <scale>0</scale>\n        <Icon><href>http://maps.google.com/mapfiles/kml/paddle/wht-blank.png</href></Icon>\n        <hotSpot x="0.5" y="0.0" xunits="fraction" yunits="fraction" />\n      </IconStyle>\n      <LabelStyle><scale>1.2</scale></LabelStyle>\n    </Style>\n`;
+                        kmlContent += `    <Point>\n      <coordinates>${cLng},${cLat},0</coordinates>\n    </Point>\n  </Placemark>\n`;
                     }
                 });
 
-                // 🌟 修复 iOS 不显示样点的元凶：不要带任何外部图片，苹果系统会自动分配自带的大头针图标！
+                // 2. 生成样点数据 (放入专门的 Folder 中)
                 const text = dataInput.value.trim();
-                text.split('\n').forEach(line => {
-                    const match = line.trim().match(/position=([\d\.]+),([\d\.]+)&name=(.*)/);
-                    if (match) {
-                        kmlContent += `    <Placemark>\n      <name><![CDATA[${decodeURIComponent(match[3])}]]></name>\n`;
-                        kmlContent += `      <Style><LabelStyle><scale>0.8</scale></LabelStyle></Style>\n`;
-                        kmlContent += `      <Point>\n        <coordinates>${match[1]},${match[2]},0</coordinates>\n      </Point>\n    </Placemark>\n`;
-                    }
-                });
+                if (text && text !== FALLBACK_POINTS_WGS84) {
+                    kmlContent += `  <Folder>\n    <name>调查样点</name>\n`;
+                    text.split('\n').forEach(line => {
+                        const match = line.trim().match(/position=([\d\.]+),([\d\.]+)&name=(.*)/);
+                        if (match) {
+                            const pName = decodeURIComponent(match[3]);
+                            kmlContent += `    <Placemark>\n      <name>${pName}</name>\n`;
+                            // 修复：严格对照原文件加入标准图标和hotSpot
+                            kmlContent += `      <Style>\n        <IconStyle>\n          <scale>0.8</scale>\n          <Icon><href>http://maps.google.com/mapfiles/kml/paddle/blu-circle.png</href></Icon>\n          <hotSpot x="0.5" y="0.0" xunits="fraction" yunits="fraction" />\n        </IconStyle>\n        <LabelStyle><scale>0.8</scale></LabelStyle>\n      </Style>\n`;
+                            kmlContent += `      <Point>\n        <coordinates>${match[1]},${match[2]},0</coordinates>\n      </Point>\n    </Placemark>\n`;
+                        }
+                    });
+                    kmlContent += `  </Folder>\n`;
+                }
 
-                kmlContent += `  </Document>\n</kml>`;
+                kmlContent += `</Document>\n</kml>`;
 
                 // 触发下载
                 const blob = new Blob([kmlContent], { type: "application/vnd.google-earth.kml+xml" });
