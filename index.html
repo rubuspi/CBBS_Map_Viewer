@@ -574,7 +574,7 @@
             });
 
             // ==========================================
-            // 🌟 纯前端：生成并下载 KML 文件逻辑 (终极修复 iOS 不显示标注问题)
+            // 🌟 纯前端：生成并下载 KML 文件逻辑 (完美兼容 iOS 苹果手机版两步路)
             // ==========================================
             document.getElementById('download-kml-btn').addEventListener('click', () => {
                 if (typeof GRID_DATA_WGS84 === 'undefined' || GRID_DATA_WGS84.length === 0) {
@@ -628,23 +628,23 @@
                         kmlContent += `      </Polygon>\n    </Placemark>\n`;
                     });
 
-                    // 🌟 修复 iPhone 无法显示编号文字：加上 CDATA 包裹 Emoji，并使用国内 HTTPS 图标
+                    // 🌟 修复 iOS 不显示文字的元凶：彻底删掉外部 <Icon> 图片请求，只用 scale=0 隐藏系统图标！
                     if (grid.name !== '未命名' && grid.name !== '未命名网格' && grid.name !== '边缘网格' && lngList.length > 0) {
                         const cLng = (lngList.reduce((a, b) => a + b, 0) / lngList.length).toFixed(6);
                         const cLat = (latList.reduce((a, b) => a + b, 0) / latList.length).toFixed(6);
                         kmlContent += `    <Placemark>\n      <name><![CDATA[${emoji} ${grid.name}]]></name>\n`;
-                        kmlContent += `      <Style><IconStyle><scale>0</scale><Icon><href>https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png</href></Icon></IconStyle><LabelStyle><scale>1.2</scale></LabelStyle></Style>\n`;
+                        kmlContent += `      <Style><IconStyle><scale>0</scale></IconStyle><LabelStyle><scale>1.2</scale></LabelStyle></Style>\n`;
                         kmlContent += `      <Point>\n        <coordinates>${cLng},${cLat},0</coordinates>\n      </Point>\n    </Placemark>\n`;
                     }
                 });
 
-                // 🌟 修复 iPhone 无法显示样点图标：使用国内 HTTPS 图标，并用 CDATA 包裹名称
+                // 🌟 修复 iOS 不显示样点的元凶：不要带任何外部图片，苹果系统会自动分配自带的大头针图标！
                 const text = dataInput.value.trim();
                 text.split('\n').forEach(line => {
                     const match = line.trim().match(/position=([\d\.]+),([\d\.]+)&name=(.*)/);
                     if (match) {
                         kmlContent += `    <Placemark>\n      <name><![CDATA[${decodeURIComponent(match[3])}]]></name>\n`;
-                        kmlContent += `      <Style><IconStyle><scale>0.8</scale><Icon><href>https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png</href></Icon></IconStyle><LabelStyle><scale>0.8</scale></LabelStyle></Style>\n`;
+                        kmlContent += `      <Style><LabelStyle><scale>0.8</scale></LabelStyle></Style>\n`;
                         kmlContent += `      <Point>\n        <coordinates>${match[1]},${match[2]},0</coordinates>\n      </Point>\n    </Placemark>\n`;
                     }
                 });
@@ -670,6 +670,7 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             });
+
         });
     </script>
 </body>
