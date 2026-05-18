@@ -614,9 +614,11 @@
 
                     let lngList = [], latList = [];
                     
-                    // 🌟 修复：将网格区域拆分为独立的 Placemark，确保样式完美生效
                     grid.polygons.forEach((polyPath, pIdx) => {
-                        kmlContent += `    <Placemark>\n      <name>${grid.name}_区域_${pIdx}</name>\n      <styleUrl>#${styleId}</styleUrl>\n      <Polygon>\n`;
+                        kmlContent += `    <Placemark>\n      <name>${grid.name}_区域_${pIdx}</name>\n`;
+                        // 🌟 暴力内联样式：强制写死紫色高亮边框 (ffcc3299) 和 半透明紫色填充 (40cc3299)
+                        kmlContent += `      <Style><LineStyle><color>ffcc3299</color><width>3</width></LineStyle><PolyStyle><color>40cc3299</color></PolyStyle></Style>\n`;
+                        kmlContent += `      <Polygon>\n`;
                         
                         polyPath.forEach((ring, rIdx) => {
                             const coordsStr = ring.map(pt => `${pt[0]},${pt[1]},0`).join(' ');
