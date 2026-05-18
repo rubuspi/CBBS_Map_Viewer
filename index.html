@@ -601,9 +601,9 @@
 
                     if (info) {
                         const status = info.status;
-                        const inv25 = info.inv2025 || info.investigator || "";
+                        const inv25 = info.inv2025 || info.investigator || ""; 
                         const hasInv2025 = inv25 && inv25 !== "无" && inv25.trim() !== "";
-
+                        
                         if (status === '已完成' || status === '已调查') { styleId = "style_done"; emoji = "✅"; }
                         else if (status === '待调查') { styleId = "style_todo"; emoji = "⏳"; }
                         else if (status === '未认领') {
@@ -613,27 +613,26 @@
                     }
 
                     let lngList = [], latList = [];
-                    kmlContent += `    <Placemark>\n      <name>${grid.name}_区域</name>\n      <styleUrl>#${styleId}</styleUrl>\n      <MultiGeometry>\n`;
-
-                    // 🌟 修复：必须多嵌套一层循环，分别处理外边界(idx=0)和内边界(idx>0)
-                    grid.polygons.forEach(polyPath => {
-                        kmlContent += `        <Polygon>\n`;
-                        polyPath.forEach((ring, idx) => {
+                    
+                    // 🌟 修复：将网格区域拆分为独立的 Placemark，确保样式完美生效
+                    grid.polygons.forEach((polyPath, pIdx) => {
+                        kmlContent += `    <Placemark>\n      <name>${grid.name}_区域_${pIdx}</name>\n      <styleUrl>#${styleId}</styleUrl>\n      <Polygon>\n`;
+                        
+                        polyPath.forEach((ring, rIdx) => {
                             const coordsStr = ring.map(pt => `${pt[0]},${pt[1]},0`).join(' ');
-                            if (idx === 0) {
-                                kmlContent += `          <outerBoundaryIs><LinearRing><coordinates>\n            ${coordsStr}\n          </coordinates></LinearRing></outerBoundaryIs>\n`;
+                            if (rIdx === 0) {
+                                kmlContent += `        <outerBoundaryIs><LinearRing><coordinates>\n          ${coordsStr}\n        </coordinates></LinearRing></outerBoundaryIs>\n`;
                             } else {
-                                kmlContent += `          <innerBoundaryIs><LinearRing><coordinates>\n            ${coordsStr}\n          </coordinates></LinearRing></innerBoundaryIs>\n`;
+                                kmlContent += `        <innerBoundaryIs><LinearRing><coordinates>\n          ${coordsStr}\n        </coordinates></LinearRing></innerBoundaryIs>\n`;
                             }
-                            // 收集坐标计算中心点
+                            // 收集坐标用于计算数字的中心点
                             ring.forEach(pt => { lngList.push(pt[0]); latList.push(pt[1]); });
                         });
-                        kmlContent += `        </Polygon>\n`;
+                        
+                        kmlContent += `      </Polygon>\n    </Placemark>\n`;
                     });
 
-                    kmlContent += `      </MultiGeometry>\n    </Placemark>\n`;
-
-                    // 生成带 Emoji 颜色的隐形文字标签
+                    // 🌟 生成中心点的纯文字编号 (带 Emoji)
                     if (grid.name !== '未命名' && grid.name !== '未命名网格' && grid.name !== '边缘网格' && lngList.length > 0) {
                         const cLng = (lngList.reduce((a, b) => a + b, 0) / lngList.length).toFixed(6);
                         const cLat = (latList.reduce((a, b) => a + b, 0) / latList.length).toFixed(6);
