@@ -574,52 +574,49 @@
             });
 
             // ==========================================
-            // 🌟 纯前端：生成并下载 KML 文件逻辑
+            // 🌟 纯前端：生成并下载 KML 文件逻辑 (完美兼容 iOS & Android)
             // ==========================================
             document.getElementById('download-kml-btn').addEventListener('click', () => {
                 if (typeof GRID_DATA_WGS84 === 'undefined' || GRID_DATA_WGS84.length === 0) {
                     return alert("未找到 WGS84 网格数据，无法生成 KML！");
                 }
 
+                // 删除了所有全局 Style，全部改用单体内联样式，防止 iOS 解析崩溃
                 let kmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>CBBS野外状态图</name>\n`;
-
-                // 写入颜色样式
-                const styles = {
-                    "done": "ff1ac452", "todo": "ff168cfa", "unclaim_has": "ffff9018", "unclaim_none": "ff2d22f5", "default": "ffcc3299"
-                };
-                for (const [key, color] of Object.entries(styles)) {
-                    kmlContent += `    <Style id="style_${key}">\n      <LineStyle><color>${color}</color><width>3</width></LineStyle>\n      <PolyStyle><color>40${color[2]}${color[3]}${color[4]}${color[5]}${color[6]}${color[7]}</color></PolyStyle>\n    </Style>\n`;
-                }
-
-                kmlContent += `    <Style id="pointStyle">\n      <IconStyle><scale>0.8</scale><Icon><href>https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png</href></Icon></IconStyle>\n      <LabelStyle><scale>0.8</scale></LabelStyle>\n    </Style>\n`;
-                kmlContent += `    <Style id="labelStyle">\n      <IconStyle><scale>0.01</scale><Icon><href>https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png</href></Icon></IconStyle>\n      <LabelStyle><scale>1.2</scale></LabelStyle>\n    </Style>\n`;
 
                 // 生成网格与标签
                 GRID_DATA_WGS84.forEach(grid => {
                     const info = typeof GRID_INFO !== 'undefined' ? GRID_INFO[grid.name] : null;
-                    let styleId = "style_default", emoji = "❔";
+                    let emoji = "❔";
+                    let polyColor = "40cc3299"; // 默认半透明天蓝
+                    let lineColor = "ffcc3299"; // 默认高亮紫边框
 
                     if (info) {
                         const status = info.status;
-                        const inv25 = info.inv2025 || info.investigator || ""; 
+                        const inv25 = info.inv2025 || info.investigator || "";
                         const hasInv2025 = inv25 && inv25 !== "无" && inv25.trim() !== "";
-                        
-                        if (status === '已完成' || status === '已调查') { styleId = "style_done"; emoji = "✅"; }
-                        else if (status === '待调查') { styleId = "style_todo"; emoji = "⏳"; }
-                        else if (status === '未认领') {
-                            if (hasInv2025) { styleId = "style_unclaim_has"; emoji = "📝"; }
-                            else { styleId = "style_unclaim_none"; emoji = "⚠️"; }
+
+                        if (status === '已完成' || status === '已调查') {
+                            emoji = "✅"; polyColor = "4052c41a"; lineColor = "ff52c41a";
+                        } else if (status === '待调查') {
+                            emoji = "⏳"; polyColor = "40168cfa"; lineColor = "ff168cfa";
+                        } else if (status === '未认领') {
+                            if (hasInv2025) {
+                                emoji = "📝"; polyColor = "40ff9018"; lineColor = "ffff9018";
+                            } else {
+                                emoji = "⚠️"; polyColor = "402d22f5"; lineColor = "ff2d22f5";
+                            }
                         }
                     }
 
                     let lngList = [], latList = [];
-                    
+
+                    // 生成网格面 (内联样式)
                     grid.polygons.forEach((polyPath, pIdx) => {
                         kmlContent += `    <Placemark>\n      <name>${grid.name}_区域_${pIdx}</name>\n`;
-                        // 🌟 暴力内联样式：强制写死紫色高亮边框 (ffcc3299) 和 半透明紫色填充 (40cc3299)
-                        kmlContent += `      <Style><LineStyle><color>ffcc3299</color><width>3</width></LineStyle><PolyStyle><color>40cc3299</color></PolyStyle></Style>\n`;
+                        kmlContent += `      <Style><LineStyle><color>${lineColor}</color><width>3</width></LineStyle><PolyStyle><color>${polyColor}</color></PolyStyle></Style>\n`;
                         kmlContent += `      <Polygon>\n`;
-                        
+
                         polyPath.forEach((ring, rIdx) => {
                             const coordsStr = ring.map(pt => `${pt[0]},${pt[1]},0`).join(' ');
                             if (rIdx === 0) {
@@ -627,44 +624,47 @@
                             } else {
                                 kmlContent += `        <innerBoundaryIs><LinearRing><coordinates>\n          ${coordsStr}\n        </coordinates></LinearRing></innerBoundaryIs>\n`;
                             }
-                            // 收集坐标用于计算数字的中心点
                             ring.forEach(pt => { lngList.push(pt[0]); latList.push(pt[1]); });
                         });
-                        
+
                         kmlContent += `      </Polygon>\n    </Placemark>\n`;
                     });
 
-                    // 🌟 生成中心点的纯文字编号 (带 Emoji)
+                    // 🌟 生成隐形文字标签 (内联样式：图标设为 0.01 隐藏，利用两步路的谷歌图钉本地缓存映射)
                     if (grid.name !== '未命名' && grid.name !== '未命名网格' && grid.name !== '边缘网格' && lngList.length > 0) {
                         const cLng = (lngList.reduce((a, b) => a + b, 0) / lngList.length).toFixed(6);
                         const cLat = (latList.reduce((a, b) => a + b, 0) / latList.length).toFixed(6);
-                        kmlContent += `    <Placemark>\n      <name>${emoji} ${grid.name}</name>\n      <styleUrl>#labelStyle</styleUrl>\n      <Point>\n        <coordinates>${cLng},${cLat},0</coordinates>\n      </Point>\n    </Placemark>\n`;
+                        kmlContent += `    <Placemark>\n      <name>${emoji} ${grid.name}</name>\n`;
+                        kmlContent += `      <Style><IconStyle><scale>0.01</scale><Icon><href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href></Icon></IconStyle><LabelStyle><scale>1.2</scale></LabelStyle></Style>\n`;
+                        kmlContent += `      <Point>\n        <coordinates>${cLng},${cLat},0</coordinates>\n      </Point>\n    </Placemark>\n`;
                     }
                 });
 
-                // 生成样点
+                // 🌟 生成样点小鸟 (内联样式：使用内置的蓝色小图钉)
                 const text = dataInput.value.trim();
                 text.split('\n').forEach(line => {
                     const match = line.trim().match(/position=([\d\.]+),([\d\.]+)&name=(.*)/);
                     if (match) {
-                        kmlContent += `    <Placemark>\n      <name>${decodeURIComponent(match[3])}</name>\n      <styleUrl>#pointStyle</styleUrl>\n      <Point>\n        <coordinates>${match[1]},${match[2]},0</coordinates>\n      </Point>\n    </Placemark>\n`;
+                        kmlContent += `    <Placemark>\n      <name>${decodeURIComponent(match[3])}</name>\n`;
+                        kmlContent += `      <Style><IconStyle><scale>0.8</scale><Icon><href>http://maps.google.com/mapfiles/kml/pushpin/blue-pushpin.png</href></Icon></IconStyle><LabelStyle><scale>0.8</scale></LabelStyle></Style>\n`;
+                        kmlContent += `      <Point>\n        <coordinates>${match[1]},${match[2]},0</coordinates>\n      </Point>\n    </Placemark>\n`;
                     }
                 });
 
                 kmlContent += `  </Document>\n</kml>`;
 
-                // 触发纯前端本地下载
+                // 触发下载
                 const blob = new Blob([kmlContent], { type: "application/vnd.google-earth.kml+xml" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                //a.download = `CBBS_All_in_One_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.kml`;
-                // 获取当前时间，格式化为 YYYYMMDD_HHMM
+
+                // 文件名加上时分秒
                 const now = new Date();
                 const timeStr = now.getFullYear().toString() +
                                 (now.getMonth() + 1).toString().padStart(2, '0') +
                                 now.getDate().toString().padStart(2, '0') + '_' +
-                                now.getHours().toString().padStart(2, '0') +
+                                now.getHours().toString().padStart(2, '0') + '_' +
                                 now.getMinutes().toString().padStart(2, '0');
 
                 a.download = `CBBS_All_in_One_${timeStr}.kml`;
