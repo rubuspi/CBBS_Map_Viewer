@@ -1,13 +1,13 @@
-// GitHub 机器人自动同步时间: 2026-05-18 15:00:02
-const GRID_UP_TIME = '2026-05-18 15:00:02';
+// GitHub 机器人自动同步时间: 2026-05-18 16:00:02
+const GRID_UP_TIME = '2026-05-18 16:00:02';
 const GRID_INFO = {
     "1": {
-        "status": "未认领",
+        "status": "待调查",
         "coordinator": "陈培涛(小PT)",
         "investigator": "",
-        "inv2026": "",
-        "rec2026": "",
-        "date": ""
+        "inv2026": "陈培涛",
+        "rec2026": "王雨佳",
+        "date": "2026年5月23日"
     },
     "2": {
         "status": "未认领",
