@@ -657,7 +657,16 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = `CBBS_野外状态图_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.kml`;
+                //a.download = `CBBS_All_in_One_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.kml`;
+                // 获取当前时间，格式化为 YYYYMMDD_HHMM
+                const now = new Date();
+                const timeStr = now.getFullYear().toString() +
+                                (now.getMonth() + 1).toString().padStart(2, '0') +
+                                now.getDate().toString().padStart(2, '0') + '_' +
+                                now.getHours().toString().padStart(2, '0') +
+                                now.getMinutes().toString().padStart(2, '0');
+
+                a.download = `CBBS_All_in_One_${timeStr}.kml`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
