@@ -574,22 +574,21 @@
             });
 
             // ==========================================
-            // 🌟 纯前端：生成并下载 KML 文件逻辑 (完美兼容 iOS & Android)
+            // 🌟 纯前端：生成并下载 KML 文件逻辑 (终极修复 iOS 不显示标注问题)
             // ==========================================
             document.getElementById('download-kml-btn').addEventListener('click', () => {
                 if (typeof GRID_DATA_WGS84 === 'undefined' || GRID_DATA_WGS84.length === 0) {
                     return alert("未找到 WGS84 网格数据，无法生成 KML！");
                 }
 
-                // 删除了所有全局 Style，全部改用单体内联样式，防止 iOS 解析崩溃
-                let kmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>CBBS野外状态图</name>\n`;
+                let kmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name><![CDATA[CBBS野外状态图]]></name>\n`;
 
                 // 生成网格与标签
                 GRID_DATA_WGS84.forEach(grid => {
                     const info = typeof GRID_INFO !== 'undefined' ? GRID_INFO[grid.name] : null;
                     let emoji = "❔";
-                    let polyColor = "40cc3299"; // 默认半透明天蓝
-                    let lineColor = "ffcc3299"; // 默认高亮紫边框
+                    let polyColor = "40cc3299";
+                    let lineColor = "ffcc3299";
 
                     if (info) {
                         const status = info.status;
@@ -611,9 +610,8 @@
 
                     let lngList = [], latList = [];
 
-                    // 生成网格面 (内联样式)
                     grid.polygons.forEach((polyPath, pIdx) => {
-                        kmlContent += `    <Placemark>\n      <name>${grid.name}_区域_${pIdx}</name>\n`;
+                        kmlContent += `    <Placemark>\n      <name><![CDATA[${grid.name}_区域_${pIdx}]]></name>\n`;
                         kmlContent += `      <Style><LineStyle><color>${lineColor}</color><width>3</width></LineStyle><PolyStyle><color>${polyColor}</color></PolyStyle></Style>\n`;
                         kmlContent += `      <Polygon>\n`;
 
@@ -630,23 +628,23 @@
                         kmlContent += `      </Polygon>\n    </Placemark>\n`;
                     });
 
-                    // 🌟 生成隐形文字标签 (内联样式：图标设为 0.01 隐藏，利用两步路的谷歌图钉本地缓存映射)
+                    // 🌟 修复 iPhone 无法显示编号文字：加上 CDATA 包裹 Emoji，并使用国内 HTTPS 图标
                     if (grid.name !== '未命名' && grid.name !== '未命名网格' && grid.name !== '边缘网格' && lngList.length > 0) {
                         const cLng = (lngList.reduce((a, b) => a + b, 0) / lngList.length).toFixed(6);
                         const cLat = (latList.reduce((a, b) => a + b, 0) / latList.length).toFixed(6);
-                        kmlContent += `    <Placemark>\n      <name>${emoji} ${grid.name}</name>\n`;
-                        kmlContent += `      <Style><IconStyle><scale>0.01</scale><Icon><href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href></Icon></IconStyle><LabelStyle><scale>1.2</scale></LabelStyle></Style>\n`;
+                        kmlContent += `    <Placemark>\n      <name><![CDATA[${emoji} ${grid.name}]]></name>\n`;
+                        kmlContent += `      <Style><IconStyle><scale>0</scale><Icon><href>https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png</href></Icon></IconStyle><LabelStyle><scale>1.2</scale></LabelStyle></Style>\n`;
                         kmlContent += `      <Point>\n        <coordinates>${cLng},${cLat},0</coordinates>\n      </Point>\n    </Placemark>\n`;
                     }
                 });
 
-                // 🌟 生成样点小鸟 (内联样式：使用内置的蓝色小图钉)
+                // 🌟 修复 iPhone 无法显示样点图标：使用国内 HTTPS 图标，并用 CDATA 包裹名称
                 const text = dataInput.value.trim();
                 text.split('\n').forEach(line => {
                     const match = line.trim().match(/position=([\d\.]+),([\d\.]+)&name=(.*)/);
                     if (match) {
-                        kmlContent += `    <Placemark>\n      <name>${decodeURIComponent(match[3])}</name>\n`;
-                        kmlContent += `      <Style><IconStyle><scale>0.8</scale><Icon><href>http://maps.google.com/mapfiles/kml/pushpin/blue-pushpin.png</href></Icon></IconStyle><LabelStyle><scale>0.8</scale></LabelStyle></Style>\n`;
+                        kmlContent += `    <Placemark>\n      <name><![CDATA[${decodeURIComponent(match[3])}]]></name>\n`;
+                        kmlContent += `      <Style><IconStyle><scale>0.8</scale><Icon><href>https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png</href></Icon></IconStyle><LabelStyle><scale>0.8</scale></LabelStyle></Style>\n`;
                         kmlContent += `      <Point>\n        <coordinates>${match[1]},${match[2]},0</coordinates>\n      </Point>\n    </Placemark>\n`;
                     }
                 });
@@ -659,15 +657,14 @@
                 const a = document.createElement("a");
                 a.href = url;
 
-                // 文件名加上时分秒
                 const now = new Date();
                 const timeStr = now.getFullYear().toString() +
                                 (now.getMonth() + 1).toString().padStart(2, '0') +
                                 now.getDate().toString().padStart(2, '0') + '_' +
-                                now.getHours().toString().padStart(2, '0') + '_' +
+                                now.getHours().toString().padStart(2, '0') +
                                 now.getMinutes().toString().padStart(2, '0');
 
-                a.download = `CBBS_All_in_One_${timeStr}.kml`;
+                a.download = `CBBS_野外状态图_${timeStr}.kml`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
