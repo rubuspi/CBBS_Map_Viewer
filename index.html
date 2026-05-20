@@ -231,11 +231,12 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             // ==========================================
-            // 🌟 核心：实时 GPS 定位与方向追踪系统 🌟
+            // 🌟 核心：实时 GPS 定位与方向追踪系统 (终极极简稳定版)
             // ==========================================
             let locationWatchId = null;
             let leafletLocationMarker = null;
             let amapLocationMarker = null;
+            let currentCompassAngle = 0; // 累计角度，配合 CSS 解决 360 度反转抽搐
 
             function wgs84togcj02(lng, lat) {
                 const a = 6378245.0, ee = 0.00669342162296594323, PI = Math.PI;
@@ -263,82 +264,41 @@
                 ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0; return ret;
             }
 
-            // ==========================================
-            // 🌟 终极修复：严格获取地磁绝对北向 + 解决360度乱转Bug
-            // ==========================================
-            let renderHeading = 0; // 界面 CSS 实际渲染的连续角度 (允许超出360或小于0)
-            let targetHeading = 0; // 传感器获取的真实目标角度 (0-360)
-            let isCompassActive = false;
-            let lastTime = 0;
-
+            // 🌟 纯净指南针读取
             function handleDeviceOrientation(event) {
-                // 每 150 毫秒才处理一次，过滤高频电磁噪音
-                const now = Date.now();
-                if (now - lastTime < 150) return;
-                lastTime = now;
-
-                let newHeading = null;
-
-                // 🌟 核心修复 1：严格区分 iOS 和 Android 的真实指南针数据
+                let heading = null;
                 if (event.webkitCompassHeading !== undefined) {
-                    newHeading = event.webkitCompassHeading; // iOS 专属绝对北
+                    heading = event.webkitCompassHeading; // iOS 设备
                 } else if (event.absolute === true && event.alpha !== null) {
-                    newHeading = 360 - event.alpha; // Android 必须带有 absolute 标志才是真指南针，否则是漂移的陀螺仪！
+                    heading = 360 - event.alpha; // Android 设备
                 }
 
-                if (newHeading !== null) {
-                    isCompassActive = true;
-
-                    // 🌟 核心修复 2：死区判断，转动小于 5 度视为手抖或放桌面上，直接无视
-                    let diff = newHeading - targetHeading;
+                if (heading !== null) {
+                    // 核心：计算最短旋转路径，彻底解决 359->1 时的原地乱转
+                    let diff = heading - (currentCompassAngle % 360);
                     if (diff > 180) diff -= 360;
                     if (diff < -180) diff += 360;
+                    currentCompassAngle += diff;
 
-                    if (Math.abs(diff) > 5) {
-                        targetHeading = newHeading; // 只有真实转动才更新目标
-                    }
+                    // 把平滑工作交给底层 CSS 的 transition 去做
+                    document.querySelectorAll('.dir-arrow-layer').forEach(el => {
+                        el.style.transform = `rotate(${currentCompassAngle}deg)`;
+                    });
                 }
             }
 
-            function smoothCompassAnimation() {
-                if (isCompassActive) {
-                    // 🌟 核心修复 3：最短路径追赶算法，彻底解决 359度 到 1度 时的反向疯狂乱转
-                    // 计算当前 CSS 角度与目标角度的真实最短距离
-                    let currentMod = renderHeading % 360;
-                    if (currentMod < 0) currentMod += 360;
-
-                    let diff = targetHeading - currentMod;
-                    if (diff > 180) diff -= 360;
-                    if (diff < -180) diff += 360;
-
-                    // 当误差大于 0.5 度时，平滑转动指针
-                    if (Math.abs(diff) > 0.5) {
-                        renderHeading += diff * 0.1; // 0.1是阻尼系数，极其顺滑
-
-                        document.querySelectorAll('.dir-arrow-layer').forEach(el => {
-                            el.style.transform = `rotate(${renderHeading}deg)`;
-                        });
-                    }
-                }
-                requestAnimationFrame(smoothCompassAnimation);
-            }
-            smoothCompassAnimation();
-
-            // 动态生成带有方向雷达底座的小粉鸟 HTML
+            // 动态生成雷达 HTML
             function getDirectionalBirdHtml(size) {
                 return `
                 <div style="position:relative; width:${size}px; height:${size}px;">
-                    <!-- 旋转的底层雷达箭头 -->
-                    <div class="dir-arrow-layer" style="position:absolute; top:-35%; left:-35%; width:170%; height:170%; transform:rotate(${lastHeading}deg); transition:transform 0.2s ease-out; z-index:1;">
+                    <!-- 🌟 这里的 transition:transform 0.4s ease-out 是防抖和顺滑的核心 -->
+                    <div class="dir-arrow-layer" style="position:absolute; top:-35%; left:-35%; width:170%; height:170%; transform:rotate(${currentCompassAngle}deg); transition:transform 0.4s ease-out; z-index:1;">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-                            <!-- 浅粉色虚线雷达光环 -->
                             <circle cx="50" cy="50" r="45" fill="rgba(255,154,162,0.15)" stroke="#FF9AA2" stroke-width="2.5" stroke-dasharray="6,4"/>
-                            <!-- 红色小叶子/箭头 -->
                             <path d="M 50 3 C 40 18 45 28 50 28 C 55 28 60 18 50 3 Z" fill="#FF4500" stroke="#FFF" stroke-width="1.5"/>
                             <path d="M 50 28 L 50 18" fill="none" stroke="#FFF" stroke-width="1.5"/>
                         </svg>
                     </div>
-                    <!-- 顶层的蜜桃小鸟 -->
                     <img src="${myLocationSvgUri}" style="width:${size}px; height:${size}px; position:absolute; top:0; left:0; z-index:2; pointer-events:none;">
                 </div>`;
             }
@@ -347,9 +307,10 @@
                 if (e.target.checked) {
                     if (!navigator.geolocation) return alert("您的浏览器不支持 GPS 定位！");
 
-                    // 尝试挂载手机指南针传感器
-                    if (window.DeviceOrientationEvent) {
+                    // 绑定指南针事件
+                    if ('ondeviceorientationabsolute' in window) {
                         window.addEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
+                    } else if (window.DeviceOrientationEvent) {
                         window.addEventListener("deviceorientation", handleDeviceOrientation, true);
                     }
 
@@ -359,16 +320,10 @@
                         const wgs84LatLng = [lat, lng];
                         const gcj02Coords = wgs84togcj02(lng, lat);
 
-                        // 兜底方案：如果指南针失效，利用 GPS 的移动航向
-                        if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
-                            lastHeading = position.coords.heading;
-                            document.querySelectorAll('.dir-arrow-layer').forEach(el => el.style.transform = `rotate(${lastHeading}deg)`);
-                        }
+                        // 🌟 彻底干掉了导致胡乱覆写方向的 GPS Heading 逻辑！
 
-                        // 1. 渲染开源地图 (Leaflet)
                         if (window.leafletInstance) {
                             let size = Math.max(20, Math.min(Math.round(25 + (window.leafletInstance.getZoom() - 10) * 1.5), 50));
-                            // 使用 divIcon 挂载自定义 HTML
                             const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
 
                             if (!leafletLocationMarker) {
@@ -376,21 +331,16 @@
                                 leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
                             } else {
                                 leafletLocationMarker.setLatLng(wgs84LatLng);
-                                leafletLocationMarker.setIcon(myDivIcon); // 触发刷新确保 HTML 正确
+                                leafletLocationMarker.setIcon(myDivIcon);
                             }
                         }
 
-                        // 2. 渲染高德地图 (AMap)
                         if (window.amapInstance) {
                             let size = Math.max(20, Math.min(Math.round(25 + (window.amapInstance.getZoom() - 10) * 1.5), 50));
-                            // 高德 content 属性直接支持传入 HTML
                             if (!amapLocationMarker) {
                                 amapLocationMarker = new window.AMap.Marker({
-                                    position: gcj02Coords,
-                                    content: getDirectionalBirdHtml(size),
-                                    offset: new window.AMap.Pixel(-size/2, -size),
-                                    zIndex: 1000,
-                                    map: window.amapInstance
+                                    position: gcj02Coords, content: getDirectionalBirdHtml(size),
+                                    offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
                                 });
                                 amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
                             } else {
@@ -402,12 +352,10 @@
                     }, (err) => {
                         console.warn("GPS 获取失败:", err);
                         document.getElementById('toggle-location').checked = false;
-                        if (err.code === 1) alert("定位失败：您拒绝了网页获取位置的权限，或系统未开启定位服务。");
-                        else if (err.code === 3) alert("定位超时：所在区域GPS信号弱。");
+                        if (err.code === 1) alert("定位失败：您拒绝了网页获取位置的权限。");
                     }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 });
 
                 } else {
-                    // 关闭监听，移除标记
                     if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId);
                     window.removeEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
                     window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
@@ -416,7 +364,6 @@
                     if (amapLocationMarker) { window.amapInstance.remove(amapLocationMarker); amapLocationMarker = null; }
                 }
             });
-            // 👆👆👆 定位系统替换到这里结束 👆👆👆
 
             const sidebar = document.getElementById('sidebar');
             const dataInput = document.getElementById('data-input');
