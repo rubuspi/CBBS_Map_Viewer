@@ -236,7 +236,6 @@
             let locationWatchId = null;
             let leafletLocationMarker = null;
             let amapLocationMarker = null;
-            let lastHeading = 0; // 记录当前方向角
 
             function wgs84togcj02(lng, lat) {
                 const a = 6378245.0, ee = 0.00669342162296594323, PI = Math.PI;
@@ -264,9 +263,6 @@
                 ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0; return ret;
             }
 
-            let locationWatchId = null;
-            let leafletLocationMarker = null;
-            let amapLocationMarker = null;
 
             // ==========================================
             // 🌟 终极方案：节流延迟 + 死区锁定 (媲美高德原生体验)
