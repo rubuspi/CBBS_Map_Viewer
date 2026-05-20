@@ -264,19 +264,44 @@
                 ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0; return ret;
             }
 
-            // 监听手机指南针方向 (部分浏览器无需授权即可直接获取)
+            // 🌟 引入低通滤波器，解决指南针疯狂抖动问题
+            let targetHeading = 0; // 传感器返回的真实目标角度
+            let isCompassActive = false; // 是否成功获取到罗盘数据
+
             function handleDeviceOrientation(event) {
                 let compass = event.webkitCompassHeading;
+                let newHeading = null;
+
                 if (compass !== undefined) {
-                    lastHeading = compass; // iOS 专属罗盘角
+                    newHeading = compass; // iOS 专属罗盘角 (绝对北)
                 } else if (event.alpha !== null) {
-                    lastHeading = 360 - event.alpha; // Android 近似罗盘角
+                    newHeading = 360 - event.alpha; // Android 陀螺仪近似角
                 }
-                // 实时用 CSS 旋转界面上的雷达箭头，极度丝滑
-                document.querySelectorAll('.dir-arrow-layer').forEach(el => {
-                    el.style.transform = `rotate(${lastHeading}deg)`;
-                });
+
+                if (newHeading !== null) {
+                    isCompassActive = true;
+                    // 防 360度 -> 0度 瞬间反向鬼畜旋转的经典处理
+                    if (newHeading - targetHeading > 180) newHeading -= 360;
+                    if (newHeading - targetHeading < -180) newHeading += 360;
+
+                    targetHeading = newHeading;
+                }
             }
+
+            // 🌟 开启一个 60帧/秒 的动画引擎，平滑追赶目标角度
+            function smoothCompassAnimation() {
+                if (isCompassActive) {
+                    // 低通滤波公式：当前角度 += (目标角度 - 当前角度) * 阻尼系数
+                    // 阻尼系数 0.1 表示让指针极其平稳、有重量感地转动，彻底过滤微小抖动
+                    lastHeading += (targetHeading - lastHeading) * 0.1;
+
+                    document.querySelectorAll('.dir-arrow-layer').forEach(el => {
+                        el.style.transform = `rotate(${lastHeading}deg)`;
+                    });
+                }
+                requestAnimationFrame(smoothCompassAnimation); // 循环请求下一帧
+            }
+            smoothCompassAnimation(); // 启动平滑动画引擎
 
             // 动态生成带有方向雷达底座的小粉鸟 HTML
             function getDirectionalBirdHtml(size) {
