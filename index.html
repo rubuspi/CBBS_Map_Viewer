@@ -443,8 +443,6 @@
                     
                     // 🌟 更换 CartoDB 高速街道图作为默认底图
                     const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' });
-                    // OSM 作为备用
-                    // const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
                     
                     const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
                     const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
@@ -457,7 +455,6 @@
 
                     L.control.layers(
                         { "🗺️ Carto标准图": cartoLayer, 
-                          //"🗺️ OSM标准图": osmLayer, 
                           "🛰️ Esri卫星图": satelliteWithLabels },
                         { "🛣️ Esri路网": esriRoads, 
                           [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:4px; margin-top:-2px;"> 样点图标`]: lMarkers },
