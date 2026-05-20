@@ -263,63 +263,64 @@
                 ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0; return ret;
             }
 
-
             // ==========================================
-            // 🌟 终极方案：节流延迟 + 死区锁定 (媲美高德原生体验)
+            // 🌟 终极修复：严格获取地磁绝对北向 + 解决360度乱转Bug
             // ==========================================
-            let lastHeading = 0;      // 界面上真实渲染的角度
-            let currentHeading = 0;   // 过滤后的目标角度
+            let renderHeading = 0; // 界面 CSS 实际渲染的连续角度 (允许超出360或小于0)
+            let targetHeading = 0; // 传感器获取的真实目标角度 (0-360)
             let isCompassActive = false;
-            let lastUpdateTime = 0;   // 用于计算延迟
+            let lastTime = 0;
 
             function handleDeviceOrientation(event) {
-                // 🌟 1. 加延迟：每 150 毫秒才处理一次数据，直接砍掉 80% 的高频抖动噪音
+                // 每 150 毫秒才处理一次，过滤高频电磁噪音
                 const now = Date.now();
-                if (now - lastUpdateTime < 500) return;
-                lastUpdateTime = now;
+                if (now - lastTime < 150) return;
+                lastTime = now;
 
-                let compass = event.webkitCompassHeading;
-                let rawHeading = null;
+                let newHeading = null;
 
-                if (compass !== undefined) {
-                    rawHeading = compass; // iOS 专属绝对北向
-                } else if (event.alpha !== null) {
-                    rawHeading = 360 - event.alpha; // Android 罗盘角
+                // 🌟 核心修复 1：严格区分 iOS 和 Android 的真实指南针数据
+                if (event.webkitCompassHeading !== undefined) {
+                    newHeading = event.webkitCompassHeading; // iOS 专属绝对北
+                } else if (event.absolute === true && event.alpha !== null) {
+                    newHeading = 360 - event.alpha; // Android 必须带有 absolute 标志才是真指南针，否则是漂移的陀螺仪！
                 }
 
-                if (rawHeading !== null) {
+                if (newHeading !== null) {
                     isCompassActive = true;
 
-                    let diff = rawHeading - currentHeading;
+                    // 🌟 核心修复 2：死区判断，转动小于 5 度视为手抖或放桌面上，直接无视
+                    let diff = newHeading - targetHeading;
                     if (diff > 180) diff -= 360;
                     if (diff < -180) diff += 360;
 
-                    // 🌟 2. 绝对死区：如果转动幅度小于 8 度，直接无视！指针锁死！
-                    if (Math.abs(diff) < 8) {
-                        return;
+                    if (Math.abs(diff) > 5) {
+                        targetHeading = newHeading; // 只有真实转动才更新目标
                     }
-
-                    // 只有幅度够大（真人在转身），才更新目标角度
-                    currentHeading += diff;
                 }
             }
 
             function smoothCompassAnimation() {
                 if (isCompassActive) {
-                    let diff = currentHeading - lastHeading;
+                    // 🌟 核心修复 3：最短路径追赶算法，彻底解决 359度 到 1度 时的反向疯狂乱转
+                    // 计算当前 CSS 角度与目标角度的真实最短距离
+                    let currentMod = renderHeading % 360;
+                    if (currentMod < 0) currentMod += 360;
+
+                    let diff = targetHeading - currentMod;
                     if (diff > 180) diff -= 360;
                     if (diff < -180) diff += 360;
 
-                    // 3. UI 渲染：极其平滑的追平动画
+                    // 当误差大于 0.5 度时，平滑转动指针
                     if (Math.abs(diff) > 0.5) {
-                        lastHeading += diff * 0.1; // 阻尼系数，让指针像泡在水里一样稳
+                        renderHeading += diff * 0.1; // 0.1是阻尼系数，极其顺滑
 
                         document.querySelectorAll('.dir-arrow-layer').forEach(el => {
-                            el.style.transform = `rotate(${lastHeading}deg)`;
+                            el.style.transform = `rotate(${renderHeading}deg)`;
                         });
                     }
                 }
-                requestAnimationFrame(smoothCompassAnimation); // 保持动画丝滑
+                requestAnimationFrame(smoothCompassAnimation);
             }
             smoothCompassAnimation();
 
