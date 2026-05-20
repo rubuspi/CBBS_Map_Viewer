@@ -264,9 +264,17 @@
                 ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0; return ret;
             }
 
-            // 🌟 终极防抖：死区锁定 + 指数平滑
-            let rawHeading = 0;    // 传感器瞬间传来的最原始数据
-            let targetHeading = 0; // 经过死区过滤后的目标角度
+            let locationWatchId = null;
+            let leafletLocationMarker = null;
+            let amapLocationMarker = null;
+            let lastHeading = 0;
+
+            // ==========================================
+            // 🌟 终极防抖：三角函数矢量滑动平均算法 (达到Web端极限稳定性)
+            // ==========================================
+            let headingQueue = [];
+            const QUEUE_SIZE = 30; // 收集最近 30 次的传感器阵列数据
+            let targetHeading = 0;
             let isCompassActive = false;
 
             function handleDeviceOrientation(event) {
@@ -274,46 +282,55 @@
                 let newHeading = null;
 
                 if (compass !== undefined) {
-                    newHeading = compass;
-                } else if (event.alpha !== null && event.absolute) {
-                    newHeading = 360 - event.alpha;
+                    newHeading = compass; // iOS 专属绝对北向
+                } else if (event.alpha !== null) {
+                    newHeading = 360 - event.alpha; // Android 罗盘角
                 }
 
                 if (newHeading !== null) {
                     isCompassActive = true;
-                    rawHeading = newHeading;
+                    // 1. 将跳动的角度拆解为 X(cos) 和 Y(sin) 矢量坐标
+                    let rad = newHeading * Math.PI / 180;
+                    headingQueue.push({ sin: Math.sin(rad), cos: Math.cos(rad) });
+
+                    if (headingQueue.length > QUEUE_SIZE) {
+                        headingQueue.shift(); // 维持队列长度
+                    }
+
+                    // 2. 求出这 30 个矢量的物理重心
+                    let sinSum = 0, cosSum = 0;
+                    for (let val of headingQueue) {
+                        sinSum += val.sin;
+                        cosSum += val.cos;
+                    }
+
+                    // 3. 将重心重新合并为极其稳定的角度
+                    let avgRad = Math.atan2(sinSum, cosSum);
+                    targetHeading = avgRad * 180 / Math.PI;
+                    if (targetHeading < 0) targetHeading += 360;
                 }
             }
 
             function smoothCompassAnimation() {
                 if (isCompassActive) {
-                    // 处理 360 度循环的跳变问题（如 359度 -> 1度 不该反转一圈）
-                    let diff = rawHeading - targetHeading;
+                    let diff = targetHeading - lastHeading;
+                    // 处理 360度 循环跳变
                     if (diff > 180) diff -= 360;
                     if (diff < -180) diff += 360;
 
-                    // 🌟 核心防抖 1：设定 4 度的“死区”（Deadzone）
-                    // 只有当你转动手机超过 4 度时，指针才认为你真的在转弯，否则忽略抖动
-                    if (Math.abs(diff) > 4) {
-                        targetHeading += diff; // 更新目标角度
+                    // 4. 最终 UI 渲染：只有偏差大于 1 度时，才以极高阻尼（0.06）缓慢跟随
+                    if (Math.abs(diff) > 1) {
+                        lastHeading += diff * 0.06;
                     }
-
-                    // 再次处理跳变，用于 UI 渲染
-                    let renderDiff = targetHeading - lastHeading;
-                    if (renderDiff > 180) renderDiff -= 360;
-                    if (renderDiff < -180) renderDiff += 360;
-
-                    // 🌟 核心防抖 2：极强阻尼（系数从 0.1 降到 0.05）
-                    // 这会让指针转动时显得非常稳重、沉稳，绝不会抽风
-                    lastHeading += renderDiff * 0.05;
 
                     document.querySelectorAll('.dir-arrow-layer').forEach(el => {
                         el.style.transform = `rotate(${lastHeading}deg)`;
                     });
                 }
-                requestAnimationFrame(smoothCompassAnimation);
+                requestAnimationFrame(smoothCompassAnimation); // 60帧丝滑渲染
             }
             smoothCompassAnimation();
+            // 👆👆👆 算法结束 👆👆👆
 
             // 动态生成带有方向雷达底座的小粉鸟 HTML
             function getDirectionalBirdHtml(size) {
