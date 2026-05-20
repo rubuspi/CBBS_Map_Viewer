@@ -267,70 +267,65 @@
             let locationWatchId = null;
             let leafletLocationMarker = null;
             let amapLocationMarker = null;
-            let lastHeading = 0;
 
             // ==========================================
-            // 🌟 终极防抖：三角函数矢量滑动平均算法 (达到Web端极限稳定性)
+            // 🌟 终极方案：节流延迟 + 死区锁定 (媲美高德原生体验)
             // ==========================================
-            let headingQueue = [];
-            const QUEUE_SIZE = 30; // 收集最近 30 次的传感器阵列数据
-            let targetHeading = 0;
+            let lastHeading = 0;      // 界面上真实渲染的角度
+            let currentHeading = 0;   // 过滤后的目标角度
             let isCompassActive = false;
+            let lastUpdateTime = 0;   // 用于计算延迟
 
             function handleDeviceOrientation(event) {
+                // 🌟 1. 加延迟：每 150 毫秒才处理一次数据，直接砍掉 80% 的高频抖动噪音
+                const now = Date.now();
+                if (now - lastUpdateTime < 150) return;
+                lastUpdateTime = now;
+
                 let compass = event.webkitCompassHeading;
-                let newHeading = null;
+                let rawHeading = null;
 
                 if (compass !== undefined) {
-                    newHeading = compass; // iOS 专属绝对北向
+                    rawHeading = compass; // iOS 专属绝对北向
                 } else if (event.alpha !== null) {
-                    newHeading = 360 - event.alpha; // Android 罗盘角
+                    rawHeading = 360 - event.alpha; // Android 罗盘角
                 }
 
-                if (newHeading !== null) {
+                if (rawHeading !== null) {
                     isCompassActive = true;
-                    // 1. 将跳动的角度拆解为 X(cos) 和 Y(sin) 矢量坐标
-                    let rad = newHeading * Math.PI / 180;
-                    headingQueue.push({ sin: Math.sin(rad), cos: Math.cos(rad) });
 
-                    if (headingQueue.length > QUEUE_SIZE) {
-                        headingQueue.shift(); // 维持队列长度
+                    let diff = rawHeading - currentHeading;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
+
+                    // 🌟 2. 绝对死区：如果转动幅度小于 8 度，直接无视！指针锁死！
+                    if (Math.abs(diff) < 8) {
+                        return;
                     }
 
-                    // 2. 求出这 30 个矢量的物理重心
-                    let sinSum = 0, cosSum = 0;
-                    for (let val of headingQueue) {
-                        sinSum += val.sin;
-                        cosSum += val.cos;
-                    }
-
-                    // 3. 将重心重新合并为极其稳定的角度
-                    let avgRad = Math.atan2(sinSum, cosSum);
-                    targetHeading = avgRad * 180 / Math.PI;
-                    if (targetHeading < 0) targetHeading += 360;
+                    // 只有幅度够大（真人在转身），才更新目标角度
+                    currentHeading += diff;
                 }
             }
 
             function smoothCompassAnimation() {
                 if (isCompassActive) {
-                    let diff = targetHeading - lastHeading;
-                    // 处理 360度 循环跳变
+                    let diff = currentHeading - lastHeading;
                     if (diff > 180) diff -= 360;
                     if (diff < -180) diff += 360;
 
-                    // 4. 最终 UI 渲染：只有偏差大于 1 度时，才以极高阻尼（0.06）缓慢跟随
-                    if (Math.abs(diff) > 1) {
-                        lastHeading += diff * 0.06;
-                    }
+                    // 3. UI 渲染：极其平滑的追平动画
+                    if (Math.abs(diff) > 0.5) {
+                        lastHeading += diff * 0.1; // 阻尼系数，让指针像泡在水里一样稳
 
-                    document.querySelectorAll('.dir-arrow-layer').forEach(el => {
-                        el.style.transform = `rotate(${lastHeading}deg)`;
-                    });
+                        document.querySelectorAll('.dir-arrow-layer').forEach(el => {
+                            el.style.transform = `rotate(${lastHeading}deg)`;
+                        });
+                    }
                 }
-                requestAnimationFrame(smoothCompassAnimation); // 60帧丝滑渲染
+                requestAnimationFrame(smoothCompassAnimation); // 保持动画丝滑
             }
             smoothCompassAnimation();
-            // 👆👆👆 算法结束 👆👆👆
 
             // 动态生成带有方向雷达底座的小粉鸟 HTML
             function getDirectionalBirdHtml(size) {
