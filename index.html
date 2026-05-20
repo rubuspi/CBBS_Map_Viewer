@@ -275,7 +275,7 @@
             function handleDeviceOrientation(event) {
                 // 🌟 1. 加延迟：每 150 毫秒才处理一次数据，直接砍掉 80% 的高频抖动噪音
                 const now = Date.now();
-                if (now - lastUpdateTime < 150) return;
+                if (now - lastUpdateTime < 500) return;
                 lastUpdateTime = now;
 
                 let compass = event.webkitCompassHeading;
