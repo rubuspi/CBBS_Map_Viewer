@@ -553,7 +553,7 @@
                     L.control.layers(
                         { "🗺️ 标准图": amapNormal, "🛰️ 卫星图": amapSatWithLabels },
                         { "🛣️ 路网": amapLabels,
-                          [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:2px; margin-top:-2px;"> 样点图标`]: lMarkers,
+                          [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:1px; margin-top:-2px;"> 样点图标`]: lMarkers,
                           "🎯 实时定位": window.gpsLayer
                         },
                         { collapsed: false }
@@ -561,10 +561,10 @@
 
                     // 🌟 监听右上角面板的打钩事件，调用定位函数
                     window.leafletInstance.on('overlayadd', (e) => {
-                        if (e.name === "🎯 显示我的实时定位") window.startGpsTracking();
+                        if (e.name === "🎯 实时定位") window.startGpsTracking();
                     });
                     window.leafletInstance.on('overlayremove', (e) => {
-                        if (e.name === "🎯 显示我的实时定位") window.stopGpsTracking();
+                        if (e.name === "🎯 实时定位") window.stopGpsTracking();
                     });
 
                     window.leafletInstance.on('zoomend', function() {
