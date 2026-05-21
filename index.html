@@ -101,6 +101,17 @@
             #sidebar.collapsed { transform: translateX(-100%); }
             .textarea-wrapper { min-height: 100px; max-height: 250px; } 
             #toggle-btn { right: -24px; width: 24px; height: 48px; font-size: 12px; }
+
+            /* 🌟 新增：强制将左上角的缩放按钮挪到屏幕右侧靠中间的位置 🌟 */
+            .leaflet-top.leaflet-left .leaflet-control-zoom {
+                position: fixed !important;
+                top: 50% !important;
+                left: auto !important;
+                right: 15px !important;
+                transform: translateY(-50%) !important;
+                margin: 0 !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+            }
         }
     </style>
 </head>
@@ -110,9 +121,16 @@
         
         <h3>CBBS 网格 & 样点渲染工具 <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 50 10 C 20 10 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 10 50 10 Z' fill='%2387CEEB'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cellipse cx='75' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%235CACEE'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%235CACEE'/%3E%3C/svg%3E" style="width:20px; height:20px;"></h3>
         
+        <!--
         <div class="engine-switch">
             <label><input type="radio" name="engine" value="osm" checked> 🌍 开源地图 (免Key)</label>
             <label><input type="radio" name="engine" value="amap"> 🇨🇳 高德地图 (需Key本地保存)</label>
+        </div>
+        -->
+
+        <div class="engine-switch">
+            <label><input type="radio" name="engine" value="osm" checked> 🚀 高德直连瓦片 (免Key)</label>
+            <label><input type="radio" name="engine" value="amap"> <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='10,40 40,55 90,10' fill='%230086FF'/%3E%3Cpolygon points='40,55 55,90 90,10' fill='%2333A3FF'/%3E%3Cpolygon points='40,55 45,75 55,90' fill='%230066CC'/%3E%3C/svg%3E" style="width:16px; vertical-align:middle; margin-right:7px; margin-top:-2px;"> 高德官方API (需Key)</label>
         </div>
 
         <div id="amap-keys" style="display:none; padding:10px; background:#f9f9f9; border-radius:4px; margin-bottom:10px;">
@@ -132,10 +150,6 @@
             </label>
             <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: bold; color: #fa8c16; line-height: 1;">
                 <input type="checkbox" id="toggle-label" checked style="margin: 0 8px 0 0; width: 16px; height: 16px; flex-shrink: 0;"> 🔢 显示网格编号
-            </label>
-            <!-- 🌟 新增：开启手机 GPS 定位跟随 -->
-            <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: bold; color: #e93e43; line-height: 1; border-top: 1px dashed #ddd; padding-top: 8px; margin-top: 4px;">
-                <input type="checkbox" id="toggle-location" style="margin: 0 8px 0 0; width: 16px; height: 16px; flex-shrink: 0;"> 🎯 显示我的实时定位
             </label>
         </div>
 
@@ -303,67 +317,71 @@
                 </div>`;
             }
 
-            document.getElementById('toggle-location').addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    if (!navigator.geolocation) return alert("您的浏览器不支持 GPS 定位！");
+            // ==========================================
+            // 🌟 将定位功能封装为独立函数，供右上角面板调用
+            // ==========================================
+            window.startGpsTracking = function() {
+                if (!navigator.geolocation) return alert("您的浏览器不支持 GPS 定位！");
 
-                    // 绑定指南针事件
-                    if ('ondeviceorientationabsolute' in window) {
-                        window.addEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
-                    } else if (window.DeviceOrientationEvent) {
-                        window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+                if ('ondeviceorientationabsolute' in window) {
+                    window.addEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
+                } else if (window.DeviceOrientationEvent) {
+                    window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+                }
+
+                locationWatchId = navigator.geolocation.watchPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const wgs84LatLng = [lat, lng];
+                    const gcj02Coords = wgs84togcj02(lng, lat);
+
+                    // 更新开源地图
+                    if (window.leafletInstance) {
+                        let size = Math.max(20, Math.min(Math.round(25 + (window.leafletInstance.getZoom() - 10) * 1.5), 50));
+                        const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
+
+                        if (!leafletLocationMarker) {
+                            leafletLocationMarker = L.marker(wgs84LatLng, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
+                            leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
+                        } else {
+                            leafletLocationMarker.setLatLng(wgs84LatLng);
+                            leafletLocationMarker.setIcon(myDivIcon);
+                        }
                     }
 
-                    locationWatchId = navigator.geolocation.watchPosition((position) => {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        const wgs84LatLng = [lat, lng];
-                        const gcj02Coords = wgs84togcj02(lng, lat);
-
-                        // 🌟 彻底干掉了导致胡乱覆写方向的 GPS Heading 逻辑！
-
-                        if (window.leafletInstance) {
-                            let size = Math.max(20, Math.min(Math.round(25 + (window.leafletInstance.getZoom() - 10) * 1.5), 50));
-                            const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
-
-                            if (!leafletLocationMarker) {
-                                leafletLocationMarker = L.marker(wgs84LatLng, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
-                                leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
-                            } else {
-                                leafletLocationMarker.setLatLng(wgs84LatLng);
-                                leafletLocationMarker.setIcon(myDivIcon);
-                            }
+                    // 更新高德地图
+                    if (window.amapInstance) {
+                        let size = Math.max(20, Math.min(Math.round(25 + (window.amapInstance.getZoom() - 10) * 1.5), 50));
+                        if (!amapLocationMarker) {
+                            amapLocationMarker = new window.AMap.Marker({
+                                position: gcj02Coords, content: getDirectionalBirdHtml(size),
+                                offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
+                            });
+                            amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
+                        } else {
+                            amapLocationMarker.setPosition(gcj02Coords);
+                            amapLocationMarker.setContent(getDirectionalBirdHtml(size));
+                            amapLocationMarker.setOffset(new window.AMap.Pixel(-size/2, -size));
                         }
+                    }
+                }, (err) => {
+                    console.warn("GPS 获取失败:", err);
+                    // 🌟 如果定位失败，自动取消右上角面板的打钩
+                    if (window.leafletInstance && window.gpsLayer) {
+                        window.leafletInstance.removeLayer(window.gpsLayer);
+                    }
+                    if (err.code === 1) alert("定位失败：您拒绝了网页获取位置的权限。");
+                }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 });
+            };
 
-                        if (window.amapInstance) {
-                            let size = Math.max(20, Math.min(Math.round(25 + (window.amapInstance.getZoom() - 10) * 1.5), 50));
-                            if (!amapLocationMarker) {
-                                amapLocationMarker = new window.AMap.Marker({
-                                    position: gcj02Coords, content: getDirectionalBirdHtml(size),
-                                    offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
-                                });
-                                //amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
-                            } else {
-                                amapLocationMarker.setPosition(gcj02Coords);
-                                amapLocationMarker.setContent(getDirectionalBirdHtml(size));
-                                amapLocationMarker.setOffset(new window.AMap.Pixel(-size/2, -size));
-                            }
-                        }
-                    }, (err) => {
-                        console.warn("GPS 获取失败:", err);
-                        document.getElementById('toggle-location').checked = false;
-                        if (err.code === 1) alert("定位失败：您拒绝了网页获取位置的权限。");
-                    }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 });
+            window.stopGpsTracking = function() {
+                if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId);
+                window.removeEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
+                window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
 
-                } else {
-                    if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId);
-                    window.removeEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
-                    window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
-
-                    if (leafletLocationMarker) { window.leafletInstance.removeLayer(leafletLocationMarker); leafletLocationMarker = null; }
-                    if (amapLocationMarker) { window.amapInstance.remove(amapLocationMarker); amapLocationMarker = null; }
-                }
-            });
+                if (leafletLocationMarker) { window.leafletInstance.removeLayer(leafletLocationMarker); leafletLocationMarker = null; }
+                if (amapLocationMarker) { window.amapInstance.remove(amapLocationMarker); amapLocationMarker = null; }
+            };
 
             const sidebar = document.getElementById('sidebar');
             const dataInput = document.getElementById('data-input');
@@ -376,14 +394,26 @@
                 this.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
             });
 
+//            document.querySelectorAll('input[name="engine"]').forEach(radio => {
+//                radio.addEventListener('change', (e) => {
+//                    const isAmap = e.target.value === 'amap';
+//                    amapKeysDiv.style.display = isAmap ? 'block' : 'none';
+//                    if (isAmap) dataInput.value = typeof POINTS_GCJ02 !== 'undefined' ? POINTS_GCJ02.trim() : FALLBACK_POINTS_GCJ02.trim();
+//                    else dataInput.value = typeof POINTS_WGS84 !== 'undefined' ? POINTS_WGS84.trim() : FALLBACK_POINTS_WGS84.trim();
+//                });
+//            });
+
             document.querySelectorAll('input[name="engine"]').forEach(radio => {
                 radio.addEventListener('change', (e) => {
                     const isAmap = e.target.value === 'amap';
                     amapKeysDiv.style.display = isAmap ? 'block' : 'none';
-                    if (isAmap) dataInput.value = typeof POINTS_GCJ02 !== 'undefined' ? POINTS_GCJ02.trim() : FALLBACK_POINTS_GCJ02.trim();
-                    else dataInput.value = typeof POINTS_WGS84 !== 'undefined' ? POINTS_WGS84.trim() : FALLBACK_POINTS_WGS84.trim();
+                    // 🌟 统一使用 GCJ02 火星坐标数据
+                    dataInput.value = typeof POINTS_GCJ02 !== 'undefined' ? POINTS_GCJ02.trim() : FALLBACK_POINTS_GCJ02.trim();
                 });
             });
+
+            // 初始化默认填充文本框
+            dataInput.value = typeof POINTS_GCJ02 !== 'undefined' ? POINTS_GCJ02.trim() : FALLBACK_POINTS_GCJ02.trim();
 
             dataInput.value = typeof POINTS_WGS84 !== 'undefined' ? POINTS_WGS84.trim() : FALLBACK_POINTS_WGS84.trim();
             document.getElementById('api-key').value = localStorage.getItem('amap_key') || '';
@@ -486,25 +516,56 @@
                     //window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5 }).setView([23.1291, 113.2644], 10);
                     window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
                     
-                    // 🌟 更换 CartoDB 高速街道图作为默认底图
-                    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' });
-                    
-                    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
-                    const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
-                    const esriRoads = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
-                    
-                    const satelliteWithLabels = L.layerGroup([esriSatellite, esriLabels]);
-                    
-                    // 默认开启 Carto
-                    cartoLayer.addTo(window.leafletInstance); 
+//                    // 🌟 更换 CartoDB 高速街道图作为默认底图
+//                    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' });
+//                    
+//                    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+//                    const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+//                    const esriRoads = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+//                    
+//                    const satelliteWithLabels = L.layerGroup([esriSatellite, esriLabels]);
+//                    
+//                    // 默认开启 Carto
+//                    cartoLayer.addTo(window.leafletInstance); 
+//
+//                    L.control.layers(
+//                        { "🗺️ Carto标准图": cartoLayer, 
+//                          "🛰️ Esri卫星图": satelliteWithLabels },
+//                        { "🛣️ Esri路网": esriRoads, 
+//                          [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:4px; margin-top:-2px;"> 样点图标`]: lMarkers },
+//                        { collapsed: false }
+//                    ).addTo(window.leafletInstance);
+
+                    // 🌟 利用高德直连瓦片 URL (免Key，国内秒开)
+                    // style=7 是标准路线图，style=6 是纯卫星图，style=8 是透明路网注记图
+                    const amapNormal = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
+                    const amapSatellite = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
+                    const amapLabels = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
+
+                    // 将卫星和注记组合
+                    const amapSatWithLabels = L.layerGroup([amapSatellite, amapLabels]);
+
+                    // 默认开启高德标准图
+                    amapNormal.addTo(window.leafletInstance);
+
+                    window.gpsLayer = L.layerGroup();
 
                     L.control.layers(
-                        { "🗺️ Carto标准图": cartoLayer, 
-                          "🛰️ Esri卫星图": satelliteWithLabels },
-                        { "🛣️ Esri路网": esriRoads, 
-                          [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:4px; margin-top:-2px;"> 样点图标`]: lMarkers },
+                        { "🗺️ 标准图": amapNormal, "🛰️ 卫星图": amapSatWithLabels },
+                        { "🛣️ 路网": amapLabels,
+                          [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:2px; margin-top:-2px;"> 样点图标`]: lMarkers,
+                          "🎯 实时定位": window.gpsLayer
+                        },
                         { collapsed: false }
                     ).addTo(window.leafletInstance);
+
+                    // 🌟 监听右上角面板的打钩事件，调用定位函数
+                    window.leafletInstance.on('overlayadd', (e) => {
+                        if (e.name === "🎯 显示我的实时定位") window.startGpsTracking();
+                    });
+                    window.leafletInstance.on('overlayremove', (e) => {
+                        if (e.name === "🎯 显示我的实时定位") window.stopGpsTracking();
+                    });
 
                     window.leafletInstance.on('zoomend', function() {
                         let zoom = window.leafletInstance.getZoom();
@@ -521,7 +582,9 @@
 
                 lMarkers.clearLayers(); lPolygons.clearLayers(); lLabels.clearLayers();
 
-                const leafGridData = typeof GRID_DATA_WGS84 !== 'undefined' ? GRID_DATA_WGS84 : (typeof GRID_DATA !== 'undefined' ? GRID_DATA : null);
+                //const leafGridData = typeof GRID_DATA_WGS84 !== 'undefined' ? GRID_DATA_WGS84 : (typeof GRID_DATA !== 'undefined' ? GRID_DATA : null);
+                // 🌟 换用高德底图后，必须使用 GCJ02 偏移坐标，否则网格对不准
+                const leafGridData = typeof GRID_DATA_GCJ02 !== 'undefined' ? GRID_DATA_GCJ02 : (typeof GRID_DATA !== 'undefined' ? GRID_DATA : null);
 
                 if (leafGridData && leafGridData.length > 0) {
                     leafGridData.forEach(grid => {
