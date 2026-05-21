@@ -545,8 +545,9 @@
                     // 将卫星和注记组合
                     const amapSatWithLabels = L.layerGroup([amapSatellite, amapLabels]);
 
-                    // 默认开启高德标准图
-                    amapNormal.addTo(window.leafletInstance);
+                    // 默认开启高德卫星图
+                    // amapNormal.addTo(window.leafletInstance);
+                    amapSatellite.addTo(window.leafletInstance);
 
                     window.gpsLayer = L.layerGroup();
 
