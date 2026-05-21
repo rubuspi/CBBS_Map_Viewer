@@ -341,10 +341,10 @@
                         const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
 
                         if (!leafletLocationMarker) {
-                            leafletLocationMarker = L.marker(wgs84LatLng, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
+                            leafletLocationMarker = L.marker(gcj02Coords, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
                             leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
                         } else {
-                            leafletLocationMarker.setLatLng(wgs84LatLng);
+                            leafletLocationMarker.setLatLng(gcj02Coords);
                             leafletLocationMarker.setIcon(myDivIcon);
                         }
                     }
@@ -357,7 +357,7 @@
                                 position: gcj02Coords, content: getDirectionalBirdHtml(size),
                                 offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
                             });
-                            amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
+                            //amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
                         } else {
                             amapLocationMarker.setPosition(gcj02Coords);
                             amapLocationMarker.setContent(getDirectionalBirdHtml(size));
@@ -786,7 +786,14 @@
                 if (document.getElementById('toggle-grid').checked) window.amapInstance.add(aPolygons);
                 if (document.getElementById('toggle-label').checked) window.amapInstance.add(aLabels);
 
+                // 🌟 判断右上角的开关状态，决定是否显示样点
+                const amapMarkerBox = document.getElementById('amap-toggle-marker');
+                if (!amapMarkerBox || amapMarkerBox.checked) {
+                    window.amapInstance.add(aMarkers);
+                }
+
                 let fitTargets = [...aMarkers];
+
                 if (document.getElementById('toggle-grid').checked) fitTargets = fitTargets.concat(aPolygons);
                 if (fitTargets.length > 0) window.amapInstance.setFitView(fitTargets);
             }
