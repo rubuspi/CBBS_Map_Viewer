@@ -341,10 +341,10 @@
                         const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
 
                         if (!leafletLocationMarker) {
-                            leafletLocationMarker = L.marker(gcj02Coords, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
+                            leafletLocationMarker = L.marker([gcj02Coords[1], gcj02Coords[0]], {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
                             leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
                         } else {
-                            leafletLocationMarker.setLatLng(gcj02Coords);
+                            leafletLocationMarker.setLatLng([gcj02Coords[1], gcj02Coords[0]]);
                             leafletLocationMarker.setIcon(myDivIcon);
                         }
                     }
