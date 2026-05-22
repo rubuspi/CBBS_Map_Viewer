@@ -131,38 +131,45 @@
     }
 
     /* 🌟 统一右侧所有悬浮面板的透明度和磨砂玻璃效果 */
-        .leaflet-control-layers, #amap-custom-control, #custom-map-tools, #legend-panel {
-            background: rgba(255, 255, 255, 0.8) !important; /* 80% 透明度 */
-            backdrop-filter: blur(8px) !important;/
-            -webkit-backdrop-filter: blur(8px) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-            border: none !important;
-            border-radius: 8px !important;
-        }
+    .leaflet-control-layers, #amap-custom-control, #legend-panel {
+        background: rgba(255, 255, 255, 0.8) !important; /* 80% 透明度 */
+        backdrop-filter: blur(8px) !important;/
+        -webkit-backdrop-filter: blur(8px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        border: none !important;
+        border-radius: 8px !important;
+    }
 
-        /* 覆盖掉旧版图例面板写死的 background */
-        #legend-panel {
-            position: absolute; bottom: 40px; right: 20px; z-index: 999;
-            padding: 15px 18px; font-size: 13px; max-height: 60vh; overflow-y: auto;
-        }
+    /* 覆盖掉旧版图例面板写死的 background */
+    #legend-panel {
+        position: absolute; bottom: 40px; right: 20px; z-index: 999;
+        padding: 15px 18px; font-size: 13px; max-height: 60vh; overflow-y: auto;
+    }
 
-        /* 隐藏开源地图原生自带的 +/- 缩放按钮 */
-        .leaflet-control-zoom { display: none !important; }
+    /* 隐藏开源地图原生自带的 +/- 缩放按钮 */
+    .leaflet-control-zoom { display: none !important; }
 
-        /* 垂直无极缩放滑块样式 */
-        #zoom-slider {
-            -webkit-appearance: slider-vertical; writing-mode: bt-lr;
-            width: 6px; height: 140px; cursor: pointer; outline: none;
-            background: rgba(0,0,0,0.1); border-radius: 4px;
-        }
-        #zoom-slider::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 22px; height: 22px;
-            background: #fff; border: 2px solid #1890ff; border-radius: 50%;
-            cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-        }
+    /* 垂直无极缩放滑块样式 */
+    #zoom-slider {
+        -webkit-appearance: slider-vertical; writing-mode: bt-lr;
+        width: 6px; height: 140px; cursor: pointer; outline: none;
+        background: rgba(0,0,0,0.1); border-radius: 4px;
+    }
+    #zoom-slider::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 22px; height: 22px;
+        background: #fff; border: 2px solid #1890ff; border-radius: 50%;
+        cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
 
     /* 🌟 给独立的折叠按钮留出位置 */
     .leaflet-top.leaflet-right .leaflet-control-layers { margin-top: 45px !important; }
+
+    /* 🌟 单独让缩放滑块框变得更透明 */
+    #custom-map-tools {
+        background: rgba(255, 255, 255, 0.3) !important; /* 0.3 是透明度，数值越小越透明 */
+        box-shadow: none !important; /* 可选：去掉阴影让它更隐形 */
+        border-radius: 8px !important;
+    }
 
 </style>
 </head>
@@ -405,7 +412,8 @@
                 const wgs84LatLng = [lat, lng];
 
                 // 2. 强制转换出 GCJ02 坐标（给高德地图用）
-                const amapCoords = wgs84togcj02(lng, lat);
+                //const amapCoords = wgs84togcj02(lng, lat);
+                const amapCoords = [lng, lat];
 
                 // 全局保存最新坐标，供点击“靶心”时调用
                 window.lastGpsCoords = { wgs84: wgs84LatLng, amap: amapCoords };
