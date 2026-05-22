@@ -351,44 +351,106 @@
             ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0; return ret;
         }
 
-        // 🌟 纯净指南针读取
-        function handleDeviceOrientation(event) {
-            let heading = null;
-            if (event.webkitCompassHeading !== undefined) {
-                heading = event.webkitCompassHeading; // iOS 设备
-            } else if (event.absolute === true && event.alpha !== null) {
-                heading = 360 - event.alpha; // Android 设备
+//        // 🌟 纯净指南针读取
+//        function handleDeviceOrientation(event) {
+//            let heading = null;
+//            if (event.webkitCompassHeading !== undefined) {
+//                heading = event.webkitCompassHeading; // iOS 设备
+//            } else if (event.absolute === true && event.alpha !== null) {
+//                heading = 360 - event.alpha; // Android 设备
+//            }
+//
+//            if (heading !== null) {
+//                // 核心：计算最短旋转路径，彻底解决 359->1 时的原地乱转
+//                let diff = heading - (currentCompassAngle % 360);
+//                if (diff > 180) diff -= 360;
+//                if (diff < -180) diff += 360;
+//                currentCompassAngle += diff;
+//
+//                // 把平滑工作交给底层 CSS 的 transition 去做
+//                document.querySelectorAll('.dir-arrow-layer').forEach(el => {
+//                    el.style.transform = `rotate(${currentCompassAngle}deg)`;
+//                });
+//            }
+//        }
+//
+//        // 动态生成雷达 HTML
+//        function getDirectionalBirdHtml(size) {
+//            return `
+//            <div style="position:relative; width:${size}px; height:${size}px;">
+//                <!-- 🌟 这里的 transition:transform 0.4s ease-out 是防抖和顺滑的核心 -->
+//                <div class="dir-arrow-layer" style="position:absolute; top:-35%; left:-35%; width:170%; height:170%; transform:rotate(${currentCompassAngle}deg); transition:transform 0.4s ease-out; z-index:1;">
+//                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+//                        <circle cx="50" cy="50" r="45" fill="rgba(255,154,162,0.15)" stroke="#FF9AA2" stroke-width="2.5" stroke-dasharray="6,4"/>
+//                        <path d="M 50 3 C 40 18 45 28 50 28 C 55 28 60 18 50 3 Z" fill="#FF4500" stroke="#FFF" stroke-width="1.5"/>
+//                        <path d="M 50 28 L 50 18" fill="none" stroke="#FFF" stroke-width="1.5"/>
+//                    </svg>
+//                </div>
+//                <img src="${myLocationSvgUri}" style="width:${size}px; height:${size}px; position:absolute; top:0; left:0; z-index:2; pointer-events:none;">
+//            </div>`;
+//        }
+        
+          // 🌟 1. 恢复指南针防抖逻辑
+            let renderHeading = 0;
+            let targetHeading = 0;
+            let isCompassActive = false;
+            let lastTime = 0;
+
+            function handleDeviceOrientation(event) {
+                const now = Date.now();
+                if (now - lastTime < 150) return;
+                lastTime = now;
+
+                let newHeading = null;
+                if (event.webkitCompassHeading !== undefined) {
+                    newHeading = event.webkitCompassHeading;
+                } else if (event.absolute === true && event.alpha !== null) {
+                    newHeading = 360 - event.alpha;
+                }
+
+                if (newHeading !== null) {
+                    isCompassActive = true;
+                    let diff = newHeading - targetHeading;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
+                    if (Math.abs(diff) > 5) targetHeading = newHeading;
+                }
             }
 
-            if (heading !== null) {
-                // 核心：计算最短旋转路径，彻底解决 359->1 时的原地乱转
-                let diff = heading - (currentCompassAngle % 360);
-                if (diff > 180) diff -= 360;
-                if (diff < -180) diff += 360;
-                currentCompassAngle += diff;
+            function smoothCompassAnimation() {
+                if (isCompassActive) {
+                    let currentMod = renderHeading % 360;
+                    if (currentMod < 0) currentMod += 360;
+                    let diff = targetHeading - currentMod;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
 
-                // 把平滑工作交给底层 CSS 的 transition 去做
-                document.querySelectorAll('.dir-arrow-layer').forEach(el => {
-                    el.style.transform = `rotate(${currentCompassAngle}deg)`;
-                });
+                    if (Math.abs(diff) > 0.5) {
+                        renderHeading += diff * 0.1;
+                        document.querySelectorAll('.dir-arrow-layer').forEach(el => {
+                            el.style.transform = `rotate(${renderHeading}deg)`;
+                        });
+                    }
+                }
+                requestAnimationFrame(smoothCompassAnimation);
             }
-        }
+            smoothCompassAnimation();
 
-        // 动态生成雷达 HTML
-        function getDirectionalBirdHtml(size) {
-            return `
-            <div style="position:relative; width:${size}px; height:${size}px;">
-                <!-- 🌟 这里的 transition:transform 0.4s ease-out 是防抖和顺滑的核心 -->
-                <div class="dir-arrow-layer" style="position:absolute; top:-35%; left:-35%; width:170%; height:170%; transform:rotate(${currentCompassAngle}deg); transition:transform 0.4s ease-out; z-index:1;">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="45" fill="rgba(255,154,162,0.15)" stroke="#FF9AA2" stroke-width="2.5" stroke-dasharray="6,4"/>
-                        <path d="M 50 3 C 40 18 45 28 50 28 C 55 28 60 18 50 3 Z" fill="#FF4500" stroke="#FFF" stroke-width="1.5"/>
-                        <path d="M 50 28 L 50 18" fill="none" stroke="#FFF" stroke-width="1.5"/>
-                    </svg>
-                </div>
-                <img src="${myLocationSvgUri}" style="width:${size}px; height:${size}px; position:absolute; top:0; left:0; z-index:2; pointer-events:none;">
-            </div>`;
-        }
+            // 🌟 2. 恢复带有雷达指示方向的动态 HTML
+            function getDirectionalBirdHtml(size) {
+                return `
+                <div style="position:relative; width:${size}px; height:${size}px;">
+                    <div class="dir-arrow-layer" style="position:absolute; top:-35%; left:-35%; width:170%; height:170%; transform:rotate(${renderHeading}deg); z-index:1;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="45" fill="rgba(255,154,162,0.15)" stroke="#FF9AA2" stroke-width="2.5" stroke-dasharray="6,4"/>
+                            <path d="M 50 3 C 40 18 45 28 50 28 C 55 28 60 18 50 3 Z" fill="#FF4500" stroke="#FFF" stroke-width="1.5"/>
+                            <path d="M 50 28 L 50 18" fill="none" stroke="#FFF" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+                    <img src="${myLocationSvgUri}" style="width:${size}px; height:${size}px; position:absolute; top:0; left:0; z-index:2; pointer-events:none;">
+                </div>`;
+            }
+
 
         // ==========================================
         // 🌟 核心：定位追踪与精准靶心回归 (无纠偏开关版)
@@ -442,7 +504,7 @@
                                 position: amapCoords, content: getDirectionalBirdHtml(size),
                                 offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
                             });
-                            amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
+                            //amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
                         } else {
                             amapLocationMarker.setPosition(amapCoords);
                             amapLocationMarker.setContent(getDirectionalBirdHtml(size));
@@ -458,6 +520,8 @@
             // 2. 关闭实时追踪
             window.stopGpsTracking = function() {
                 if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId);
+                window.removeEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
+                window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
                 if (leafletLocationMarker) { window.leafletInstance.removeLayer(leafletLocationMarker); leafletLocationMarker = null; }
                 if (amapLocationMarker) { window.amapInstance.remove(amapLocationMarker); amapLocationMarker = null; }
             };
