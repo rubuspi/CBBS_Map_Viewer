@@ -412,8 +412,7 @@
                 const wgs84LatLng = [lat, lng];
 
                 // 2. 强制转换出 GCJ02 坐标（给高德地图用）
-                //const amapCoords = wgs84togcj02(lng, lat);
-                const amapCoords = [lng, lat];
+                const amapCoords = wgs84togcj02(lng, lat);
 
                 // 全局保存最新坐标，供点击“靶心”时调用
                 window.lastGpsCoords = { wgs84: wgs84LatLng, amap: amapCoords };
@@ -424,10 +423,10 @@
                     const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
 
                     if (!leafletLocationMarker) {
-                        leafletLocationMarker = L.marker(wgs84LatLng, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
+                        leafletLocationMarker = L.marker(amapCoords, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
                         leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
                     } else {
-                        leafletLocationMarker.setLatLng(wgs84LatLng);
+                        leafletLocationMarker.setLatLng(amapCoords);
                         leafletLocationMarker.setIcon(myDivIcon);
                     }
                 }
@@ -642,7 +641,7 @@
                     { "🗺️ 标准图": amapNormal, "🛰️ 卫星图": amapSatellite },
                     { "🛣️ 路网": amapLabels,
                         [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:1px; margin-top:-2px;"> 样点图标`]: lMarkers,
-                        //"🎯 实时定位": window.gpsLayer
+                        "🎯 实时定位": window.gpsLayer
                     },
                     { collapsed: false }
                 ).addTo(window.leafletInstance);
@@ -1087,7 +1086,7 @@
                                     window.amapInstance.setZoomAndCenter(16.5, window.lastGpsCoords.amap);
                                 }
                             } else {
-                                alert("正在搜索卫星信号，请稍等两秒再点一次🎯...");
+                                //alert("正在搜索卫星信号，请稍等两秒再点一次🎯...");
                             }
                         }, 600);
                     } else {
