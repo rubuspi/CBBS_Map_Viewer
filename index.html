@@ -395,48 +395,58 @@
         // ==========================================
         let isTrackingActive = false; // 记录靶心状态
 
-                    // 1. 开启实时追踪 (由右上角图层面板触发)
+        // 3. 开启实时追踪 (由右上角面板触发)
             window.startGpsTracking = function() {
                 if (!navigator.geolocation) return alert("您的浏览器不支持 GPS 定位！");
+
+                if ('ondeviceorientationabsolute' in window) {
+                    window.addEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
+                } else if (window.DeviceOrientationEvent) {
+                    window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+                }
 
                 locationWatchId = navigator.geolocation.watchPosition((position) => {
                     const rawLat = position.coords.latitude;
                     const rawLng = position.coords.longitude;
 
-                    // 🌟 核心修复：强制把浏览器获取的 WGS84 转换为高德底图所需的 GCJ02 火星坐标
+                    // 🌟 强制将 GPS 的 WGS84 纠偏为高德底图通用的 GCJ02 火星坐标
                     const gcj02 = wgs84togcj02(rawLng, rawLat);
                     const gcj02Lng = gcj02[0];
                     const gcj02Lat = gcj02[1];
 
-                    // 🌟 核心修复2：严格区分数组顺序，绝不会再跑到北极
-                    const leafletCoords = [gcj02Lat, gcj02Lng]; // Leaflet 格式: [纬度, 经度]
-                    const amapCoords = [gcj02Lng, gcj02Lat];    // 高德 格式: [经度, 纬度]
+                    // 🌟 严格区分格式：Leaflet 要 [纬度,经度]，高德 要 [经度,纬度] (绝不跑北极)
+                    const leafletCoords = [gcj02Lat, gcj02Lng];
+                    const amapCoords = [gcj02Lng, gcj02Lat];
 
-                    // 更新 Leaflet 上的图标
+                    window.lastGpsCoords = { leaflet: leafletCoords, amap: amapCoords };
+
+                    // 挂载动态雷达 HTML 到 Leaflet
                     if (window.leafletInstance) {
                         let size = Math.max(20, Math.min(Math.round(25 + (window.leafletInstance.getZoom() - 10) * 1.5), 50));
-                        const myIcon = L.icon({ iconUrl: myLocationSvgUri, iconSize: [size, size], iconAnchor: [size/2, size] });
+                        const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
 
                         if (!leafletLocationMarker) {
-                            leafletLocationMarker = L.marker(leafletCoords, {icon: myIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
+                            leafletLocationMarker = L.marker(leafletCoords, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
                             leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
                         } else {
                             leafletLocationMarker.setLatLng(leafletCoords);
-                            leafletLocationMarker.setIcon(myIcon);
+                            leafletLocationMarker.setIcon(myDivIcon);
                         }
                     }
 
-                    // 更新高德上的图标
+                    // 挂载动态雷达 HTML 到高德
                     if (window.amapInstance) {
                         let size = Math.max(20, Math.min(Math.round(25 + (window.amapInstance.getZoom() - 10) * 1.5), 50));
-                        const aIcon = new window.AMap.Icon({ size: new window.AMap.Size(size, size), image: myLocationSvgUri, imageSize: new window.AMap.Size(size, size) });
-
                         if (!amapLocationMarker) {
-                            amapLocationMarker = new window.AMap.Marker({ position: amapCoords, icon: aIcon, offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance });
+                            amapLocationMarker = new window.AMap.Marker({
+                                position: amapCoords, content: getDirectionalBirdHtml(size),
+                                offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
+                            });
                             amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
                         } else {
                             amapLocationMarker.setPosition(amapCoords);
-                            amapLocationMarker.setIcon(aIcon);
+                            amapLocationMarker.setContent(getDirectionalBirdHtml(size));
+                            amapLocationMarker.setOffset(new window.AMap.Pixel(-size/2, -size));
                         }
                     }
                 }, (err) => {
