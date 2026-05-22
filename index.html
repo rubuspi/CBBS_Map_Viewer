@@ -1,427 +1,459 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CBBS样点与网格渲染工具</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CBBS样点与网格渲染工具</title>
+
+<!-- 引入 Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- 🌟 引入分离的数据文件 🌟 -->
+<script src="mapData_WGS84.js"></script>
+<script src="mapData_GCJ02.js"></script>
+<script src="GridStatus.js"></script>
+
+<style>
+    body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+    #sidebar { 
+        width: 350px; flex-shrink: 0; background: #fff; box-shadow: 2px 0 8px rgba(0,0,0,0.15); 
+        z-index: 1000; position: relative; display: flex; flex-direction: column; 
+        padding: 20px; box-sizing: border-box; transition: margin-left 0.3s ease;
+    }
+
+    #sidebar.collapsed { margin-left: -350px; }
+    #toggle-btn {
+        position: absolute; right: -28px; top: 65%; transform: translateY(-50%);
+        width: 28px; height: 60px; background: #fff; border: 1px solid #ddd;
+        border-left: none; border-radius: 0 8px 8px 0; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 3px 0 5px rgba(0,0,0,0.1); color: #666; font-size: 14px; transition: all 0.3s ease;
+    }
+    #toggle-btn:hover { background: #f9f9f9; color: #1890ff; }
     
-    <!-- 引入 Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    #map-wrapper { flex: 1; height: 100%; position: relative; background: #f0f0f0; }
+    .map-layer { position: absolute; top:0; left:0; width:100%; height:100%; display:none; }
+    .map-layer.active { display:block; }
 
-    <!-- 🌟 引入分离的数据文件 🌟 -->
-    <script src="mapData_WGS84.js"></script>
-    <script src="mapData_GCJ02.js"></script>
-    <script src="GridStatus.js"></script>
+    h3 { margin-top: 0; font-size: 18px; color: #333; display: flex; align-items: center; gap: 6px; }
+    .input-group { margin-bottom: 12px; }
+    .input-group label { display: block; font-size: 13px; color: #666; margin-bottom: 5px; font-weight: bold; }
+    .input-group input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    
+    .engine-switch { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+    .engine-switch label { display: flex; align-items: center; font-size: 14px; cursor: pointer; color: #333; font-weight: bold; }
+    .engine-switch input { width: auto; margin-right: 5px; cursor: pointer; }
 
-    <style>
-        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .textarea-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 60px; margin-bottom: 5px; }
+    textarea { flex: 1; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; resize: none; font-size: 12px; font-family: monospace; white-space: pre; overflow-x: auto; box-sizing: border-box; }
+    
+    button.action-btn { margin-top: 15px; padding: 12px; cursor: pointer; background: #1890ff; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 15px; transition: 0.3s; flex-shrink: 0; }
+    button.action-btn:hover { background: #40a9ff; }
 
-        #sidebar { 
-            width: 350px; flex-shrink: 0; background: #fff; box-shadow: 2px 0 8px rgba(0,0,0,0.15); 
-            z-index: 1000; position: relative; display: flex; flex-direction: column; 
-            padding: 20px; box-sizing: border-box; transition: margin-left 0.3s ease;
+    .amap-maptype { display: block !important; }
+    
+    .custom-close-btn {
+        position: absolute; right: 6px; top: 6px; width: 18px; height: 18px;
+        background: #eee; color: #666; border-radius: 50%; text-align: center;
+        line-height: 16px; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; z-index:99;
+    }
+    .custom-close-btn:hover { background: #ff4d4f; color: white; }
+
+    #legend-panel {
+        position: absolute; bottom: 40px; right: 20px; z-index: 999;
+        background: rgba(255, 255, 255, 0.95); padding: 15px 18px; border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15); backdrop-filter: blur(4px); font-size: 13px; max-height: 60vh; overflow-y: auto;
+    }
+    .legend-item { display: flex; align-items: center; margin-bottom: 10px; }
+    .legend-item:last-child { margin-bottom: 0; }
+    .legend-color { width: 16px; height: 16px; margin-right: 8px; border-radius: 3px; border: 2px solid; flex-shrink: 0; }
+    .count-badge { font-weight: 900; font-size: 14px; margin-left: 5px; }
+
+    #legend-toggle-btn {
+        position: absolute; bottom: 40px; right: 20px; z-index: 1000;
+        background: #fff; padding: 6px 10px; border-radius: 4px; font-size: 12px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15); border: 1px solid #ccc; cursor: pointer; display: none;
+    }
+
+    .leaflet-custom-text {
+        background: transparent; border: none; font-size: 16px; font-weight: 900;
+        text-shadow: 1px 1px 2px #fff, -1px -1px 2px #fff, 1px -1px 2px #fff, -1px 1px 2px #fff; white-space: nowrap; text-align: center;
+    }
+
+    .leaflet-popup-content-wrapper { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+    .leaflet-popup-tip-container { display: none !important; }
+    .leaflet-custom-popup .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+
+    .hover-tooltip {
+        background: rgba(0, 0, 0, 0.75) !important; color: #fff !important;
+        padding: 4px 8px !important; border-radius: 4px !important;
+        font-size: 12px !important; border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+        pointer-events: none !important; white-space: nowrap;
+    }
+    .leaflet-tooltip.hover-tooltip { background: rgba(0, 0, 0, 0.75) !important; border: none !important; }
+    .leaflet-tooltip.hover-tooltip::before { border-top-color: rgba(0, 0, 0, 0.75) !important; }
+
+    @media (max-width: 768px) {
+        #sidebar { position: absolute; height: 100%; width: 85%; max-width: 320px; transition: transform 0.3s ease; margin-left: 0 !important; }
+        #sidebar.collapsed { transform: translateX(-100%); }
+        .textarea-wrapper { min-height: 100px; max-height: 250px; } 
+        #toggle-btn { right: -24px; width: 24px; height: 48px; font-size: 12px; }
+
+    }
+
+    /* 🌟 隐藏开源地图原生自带的 +/- 缩放按钮 */
+    .leaflet-control-zoom { display: none !important; }
+
+    /* 🌟 垂直无极缩放滑块的专属样式 */
+    #zoom-slider {
+        -webkit-appearance: slider-vertical;
+        writing-mode: bt-lr;
+        width: 6px;
+        height: 140px;
+        cursor: pointer;
+        outline: none;
+        background: #ddd;
+        border-radius: 4px;
+    }
+    #zoom-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 22px;
+        height: 22px;
+        background: #fff;
+        border: 2px solid #1890ff;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    /* 🌟 统一右侧所有悬浮面板的透明度和磨砂玻璃效果 */
+        .leaflet-control-layers, #amap-custom-control, #custom-map-tools, #legend-panel {
+            background: rgba(255, 255, 255, 0.6) !important; /* 80% 透明度 */
+            /* backdrop-filter: blur(8px) !important; */
+            -webkit-backdrop-filter: blur(8px) !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+            border: none !important;
+            border-radius: 8px !important;
         }
 
-        #sidebar.collapsed { margin-left: -350px; }
-        #toggle-btn {
-            position: absolute; right: -28px; top: 65%; transform: translateY(-50%);
-            width: 28px; height: 60px; background: #fff; border: 1px solid #ddd;
-            border-left: none; border-radius: 0 8px 8px 0; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 3px 0 5px rgba(0,0,0,0.1); color: #666; font-size: 14px; transition: all 0.3s ease;
-        }
-        #toggle-btn:hover { background: #f9f9f9; color: #1890ff; }
-        
-        #map-wrapper { flex: 1; height: 100%; position: relative; background: #f0f0f0; }
-        .map-layer { position: absolute; top:0; left:0; width:100%; height:100%; display:none; }
-        .map-layer.active { display:block; }
-
-        h3 { margin-top: 0; font-size: 18px; color: #333; display: flex; align-items: center; gap: 6px; }
-        .input-group { margin-bottom: 12px; }
-        .input-group label { display: block; font-size: 13px; color: #666; margin-bottom: 5px; font-weight: bold; }
-        .input-group input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-        
-        .engine-switch { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
-        .engine-switch label { display: flex; align-items: center; font-size: 14px; cursor: pointer; color: #333; font-weight: bold; }
-        .engine-switch input { width: auto; margin-right: 5px; cursor: pointer; }
-
-        .textarea-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 60px; margin-bottom: 5px; }
-        textarea { flex: 1; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; resize: none; font-size: 12px; font-family: monospace; white-space: pre; overflow-x: auto; box-sizing: border-box; }
-        
-        button.action-btn { margin-top: 15px; padding: 12px; cursor: pointer; background: #1890ff; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 15px; transition: 0.3s; flex-shrink: 0; }
-        button.action-btn:hover { background: #40a9ff; }
-
-        .amap-maptype { display: block !important; }
-        
-        .custom-close-btn {
-            position: absolute; right: 6px; top: 6px; width: 18px; height: 18px;
-            background: #eee; color: #666; border-radius: 50%; text-align: center;
-            line-height: 16px; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; z-index:99;
-        }
-        .custom-close-btn:hover { background: #ff4d4f; color: white; }
-
+        /* 覆盖掉旧版图例面板写死的 background */
         #legend-panel {
             position: absolute; bottom: 40px; right: 20px; z-index: 999;
-            background: rgba(255, 255, 255, 0.95); padding: 15px 18px; border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15); backdrop-filter: blur(4px); font-size: 13px; max-height: 60vh; overflow-y: auto;
-        }
-        .legend-item { display: flex; align-items: center; margin-bottom: 10px; }
-        .legend-item:last-child { margin-bottom: 0; }
-        .legend-color { width: 16px; height: 16px; margin-right: 8px; border-radius: 3px; border: 2px solid; flex-shrink: 0; }
-        .count-badge { font-weight: 900; font-size: 14px; margin-left: 5px; }
-
-        #legend-toggle-btn {
-            position: absolute; bottom: 40px; right: 20px; z-index: 1000;
-            background: #fff; padding: 6px 10px; border-radius: 4px; font-size: 12px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.15); border: 1px solid #ccc; cursor: pointer; display: none;
+            padding: 15px 18px; font-size: 13px; max-height: 60vh; overflow-y: auto;
         }
 
-        .leaflet-custom-text {
-            background: transparent; border: none; font-size: 16px; font-weight: 900;
-            text-shadow: 1px 1px 2px #fff, -1px -1px 2px #fff, 1px -1px 2px #fff, -1px 1px 2px #fff; white-space: nowrap; text-align: center;
-        }
-
-        .leaflet-popup-content-wrapper { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
-        .leaflet-popup-tip-container { display: none !important; }
-        .leaflet-custom-popup .leaflet-popup-content { margin: 0 !important; width: auto !important; }
-
-        .hover-tooltip {
-            background: rgba(0, 0, 0, 0.75) !important; color: #fff !important;
-            padding: 4px 8px !important; border-radius: 4px !important;
-            font-size: 12px !important; border: none !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
-            pointer-events: none !important; white-space: nowrap;
-        }
-        .leaflet-tooltip.hover-tooltip { background: rgba(0, 0, 0, 0.75) !important; border: none !important; }
-        .leaflet-tooltip.hover-tooltip::before { border-top-color: rgba(0, 0, 0, 0.75) !important; }
-
-        @media (max-width: 768px) {
-            #sidebar { position: absolute; height: 100%; width: 85%; max-width: 320px; transition: transform 0.3s ease; margin-left: 0 !important; }
-            #sidebar.collapsed { transform: translateX(-100%); }
-            .textarea-wrapper { min-height: 100px; max-height: 250px; } 
-            #toggle-btn { right: -24px; width: 24px; height: 48px; font-size: 12px; }
-
-        }
-
-        /* 🌟 隐藏开源地图原生自带的 +/- 缩放按钮 */
+        /* 隐藏开源地图原生自带的 +/- 缩放按钮 */
         .leaflet-control-zoom { display: none !important; }
 
-        /* 🌟 垂直无极缩放滑块的专属样式 */
+        /* 垂直无极缩放滑块样式 */
         #zoom-slider {
-            -webkit-appearance: slider-vertical;
-            writing-mode: bt-lr;
-            width: 6px;
-            height: 140px;
-            cursor: pointer;
-            outline: none;
-            background: #ddd;
-            border-radius: 4px;
+            -webkit-appearance: slider-vertical; writing-mode: bt-lr;
+            width: 6px; height: 140px; cursor: pointer; outline: none;
+            background: rgba(0,0,0,0.1); border-radius: 4px;
         }
         #zoom-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 22px;
-            height: 22px;
-            background: #fff;
-            border: 2px solid #1890ff;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            -webkit-appearance: none; width: 22px; height: 22px;
+            background: #fff; border: 2px solid #1890ff; border-radius: 50%;
+            cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
         }
-    </style>
+</style>
 </head>
 <body>
-    <div id="sidebar">
-        <div id="toggle-btn" title="收起/展开面板">◀</div>
-        
-        <h3>CBBS 网格 & 样点渲染工具 <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 50 10 C 20 10 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 10 50 10 Z' fill='%2387CEEB'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cellipse cx='75' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%235CACEE'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%235CACEE'/%3E%3C/svg%3E" style="width:20px; height:20px;"></h3>
-        
-        <!--
-        <div class="engine-switch">
-            <label><input type="radio" name="engine" value="osm" checked> 🌍 开源地图 (免Key)</label>
-            <label><input type="radio" name="engine" value="amap"> 🇨🇳 高德地图 (需Key本地保存)</label>
-        </div>
-        -->
+<div id="sidebar">
+    <div id="toggle-btn" title="收起/展开面板">◀</div>
+    
+    <h3>CBBS 网格 & 样点渲染工具 <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 50 10 C 20 10 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 10 50 10 Z' fill='%2387CEEB'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cellipse cx='75' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%235CACEE'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%235CACEE'/%3E%3C/svg%3E" style="width:20px; height:20px;"></h3>
+    
+    <!--
+    <div class="engine-switch">
+        <label><input type="radio" name="engine" value="osm" checked> 🌍 开源地图 (免Key)</label>
+        <label><input type="radio" name="engine" value="amap"> 🇨🇳 高德地图 (需Key本地保存)</label>
+    </div>
+    -->
 
-        <div class="engine-switch">
-            <label><input type="radio" name="engine" value="osm" checked> 🚀 高德直连瓦片 (免Key)</label>
-            <label><input type="radio" name="engine" value="amap"> <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='10,40 40,55 90,10' fill='%230086FF'/%3E%3Cpolygon points='40,55 55,90 90,10' fill='%2333A3FF'/%3E%3Cpolygon points='40,55 45,75 55,90' fill='%230066CC'/%3E%3C/svg%3E" style="width:16px; vertical-align:middle; margin-right:7px; margin-top:-2px;"> 高德官方API (需Key)</label>
-        </div>
+    <div class="engine-switch">
+        <label><input type="radio" name="engine" value="osm" checked> 🚀 高德直连瓦片 (免Key)</label>
+        <label><input type="radio" name="engine" value="amap"> <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='10,40 40,55 90,10' fill='%230086FF'/%3E%3Cpolygon points='40,55 55,90 90,10' fill='%2333A3FF'/%3E%3Cpolygon points='40,55 45,75 55,90' fill='%230066CC'/%3E%3C/svg%3E" style="width:16px; vertical-align:middle; margin-right:7px; margin-top:-2px;"> 高德官方API (需Key)</label>
+    </div>
 
-        <div id="amap-keys" style="display:none; padding:10px; background:#f9f9f9; border-radius:4px; margin-bottom:10px;">
-            <div class="input-group" style="margin-bottom:8px;">
-                <label style="font-size:12px;">高德 API Key</label>
-                <input type="text" id="api-key" placeholder="仅保存在您的浏览器">
-            </div>
-            <div class="input-group" style="margin-bottom:0;">
-                <label style="font-size:12px;">安全密钥 (jscode)</label>
-                <input type="text" id="sec-key" placeholder="仅保存在您的浏览器">
-            </div>
+    <div id="amap-keys" style="display:none; padding:10px; background:#f9f9f9; border-radius:4px; margin-bottom:10px;">
+        <div class="input-group" style="margin-bottom:8px;">
+            <label style="font-size:12px;">高德 API Key</label>
+            <input type="text" id="api-key" placeholder="仅保存在您的浏览器">
         </div>
-        
-        <div style="display: flex; flex-direction: column; gap: 8px; margin: 12px 0;">
-            <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: bold; color: #1890ff; line-height: 1;">
-                <input type="checkbox" id="toggle-grid" checked style="margin: 0 8px 0 0; width: 16px; height: 16px; flex-shrink: 0;"> 🔲 显示网格图层
-            </label>
-            <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: bold; color: #fa8c16; line-height: 1;">
-                <input type="checkbox" id="toggle-label" checked style="margin: 0 8px 0 0; width: 16px; height: 16px; flex-shrink: 0;"> 🔢 显示网格编号
-            </label>
+        <div class="input-group" style="margin-bottom:0;">
+            <label style="font-size:12px;">安全密钥 (jscode)</label>
+            <input type="text" id="sec-key" placeholder="仅保存在您的浏览器">
         </div>
-
-        <div class="textarea-wrapper">
-            <label style="font-size:13px; color:#666; font-weight:bold; margin-bottom:5px;">请粘贴当前坐标系下的样点 URL 文本：</label>
-            <textarea id="data-input"></textarea>
-        </div>
-        <button id="render-btn" class="action-btn">生成地图</button>
-        <!-- 🌟 新增：下载 KML 的按钮 -->
-        <button id="download-kml-btn" class="action-btn" style="background:#52c41a; margin-top:10px;">下载网格KML文件</button>
     </div>
     
-    <div id="map-wrapper">
-        <!-- 🌟 新增：靠右居中的无极缩放滑块与靶心定位按钮 -->
-        <div id="custom-map-tools" style="position:absolute; right:15px; top:50%; transform:translateY(-50%); z-index:1000; display:flex; flex-direction:column; align-items:center; background:rgba(255,255,255,0.9); padding:12px 8px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.2); backdrop-filter:blur(4px);">
-            <!-- 滑动条 (范围5~19级，支持小数级无缝缩放) -->
+    <div style="display: flex; flex-direction: column; gap: 8px; margin: 12px 0;">
+        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: bold; color: #1890ff; line-height: 1;">
+            <input type="checkbox" id="toggle-grid" checked style="margin: 0 8px 0 0; width: 16px; height: 16px; flex-shrink: 0;"> 🔲 显示网格图层
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: bold; color: #fa8c16; line-height: 1;">
+            <input type="checkbox" id="toggle-label" checked style="margin: 0 8px 0 0; width: 16px; height: 16px; flex-shrink: 0;"> 🔢 显示网格编号
+        </label>
+    </div>
+
+    <div class="textarea-wrapper">
+        <label style="font-size:13px; color:#666; font-weight:bold; margin-bottom:5px;">请粘贴当前坐标系下的样点 URL 文本：</label>
+        <textarea id="data-input"></textarea>
+    </div>
+    <button id="render-btn" class="action-btn">生成地图</button>
+    <!-- 🌟 新增：下载 KML 的按钮 -->
+    <button id="download-kml-btn" class="action-btn" style="background:#52c41a; margin-top:10px;">下载网格KML文件</button>
+</div>
+
+<div id="map-wrapper">
+
+    <!-- 🌟 右侧居中的无极缩放滑块与靶心定位按钮 -->
+        <div id="custom-map-tools" style="position:absolute; right:15px; top:50%; transform:translateY(-50%); z-index:1000; display:flex; flex-direction:column; align-items:center; padding:12px 8px;">
+            <!-- 滑动条 -->
             <input type="range" id="zoom-slider" min="5" max="19" step="0.1" value="10" title="拖动无极缩放">
 
-            <!-- 靶点按钮 -->
-            <div id="locate-btn" title="回到我的定位" style="margin-top:15px; cursor:pointer; font-size:18px; width:34px; height:34px; background:#1890ff; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.3); transition:0.2s;">
+            <!-- 🌟 靶点按钮 (兼具 开启/关闭 定位功能) -->
+            <div id="locate-btn" title="开启/关闭实时定位" style="margin-top:15px; cursor:pointer; font-size:18px; width:34px; height:34px; background:rgba(255,255,255,0.9); color:#333; border: 2px solid #ccc; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:0.3s;">
                 🎯
             </div>
         </div>
 
-        <div id="leaflet-container" class="map-layer active"></div>
-        <div id="amap-container" class="map-layer"></div>
+    <div id="leaflet-container" class="map-layer active"></div>
+    <div id="amap-container" class="map-layer"></div>
 
-        <div id="legend-panel">
-            <div style="font-weight:bold; text-align:center; font-size:14px; color:#333; padding-bottom:4px;">📊 网格状态看板</div>
-            <div id="update-time-display" style="text-align:center; font-size:11px; color:#999; margin-bottom:12px; border-bottom:1px solid #ddd; padding-bottom:6px;">更新时间: 正在获取...</div>
-            
-            <div class="legend-item" title="已完成(2025已调查) + 已完成(2025未调查)">
-                <div class="legend-color" style="background:rgba(82, 196, 26, 0.2); border-color:#52c41a;"></div>
-                <span style="color:#52c41a;">已完成:</span>
-                <span class="count-badge" id="count-done" style="color:#52c41a;">0 + 0</span>
-            </div>
-            
-            <div class="legend-item" title="待调查(2025已调查) + 待调查(2025未调查)">
-                <div class="legend-color" style="background:rgba(250, 140, 22, 0.2); border-color:#fa8c16;"></div>
-                <span style="color:#fa8c16;">待调查:</span>
-                <span class="count-badge" id="count-todo" style="color:#fa8c16;">0 + 0</span>
-            </div>
-            
-            <div class="legend-item">
-                <div class="legend-color" style="background:rgba(24, 144, 255, 0.2); border-color:#1890ff;"></div>
-                <span style="color:#1890ff;">未认领(25年已调查):</span>
-                <span class="count-badge" id="count-unclaimed-has" style="color:#1890ff;">0</span>
-            </div>
-            
-            <div class="legend-item">
-                <div class="legend-color" style="background:rgba(245, 34, 45, 0.2); border-color:#f5222d;"></div>
-                <span style="color:#f5222d;">未认领(25年未调查):</span>
-                <span class="count-badge" id="count-unclaimed-none" style="color:#f5222d;">0</span>
-            </div>
-
-            <div style="text-align:right; margin-top:10px;">
-                <span onclick="document.getElementById('legend-panel').style.display='none'; document.getElementById('legend-toggle-btn').style.display='block';" style="color:#666; cursor:pointer; font-size:12px; text-decoration:underline;">隐藏面板</span>
-            </div>
+    <div id="legend-panel">
+        <div style="font-weight:bold; text-align:center; font-size:14px; color:#333; padding-bottom:4px;">📊 网格状态看板</div>
+        <div id="update-time-display" style="text-align:center; font-size:11px; color:#999; margin-bottom:12px; border-bottom:1px solid #ddd; padding-bottom:6px;">更新时间: 正在获取...</div>
+        
+        <div class="legend-item" title="已完成(2025已调查) + 已完成(2025未调查)">
+            <div class="legend-color" style="background:rgba(82, 196, 26, 0.2); border-color:#52c41a;"></div>
+            <span style="color:#52c41a;">已完成:</span>
+            <span class="count-badge" id="count-done" style="color:#52c41a;">0 + 0</span>
         </div>
-        <button id="legend-toggle-btn" onclick="document.getElementById('legend-panel').style.display='block'; this.style.display='none';">📊 显示状态看板</button>
+        
+        <div class="legend-item" title="待调查(2025已调查) + 待调查(2025未调查)">
+            <div class="legend-color" style="background:rgba(250, 140, 22, 0.2); border-color:#fa8c16;"></div>
+            <span style="color:#fa8c16;">待调查:</span>
+            <span class="count-badge" id="count-todo" style="color:#fa8c16;">0 + 0</span>
+        </div>
+        
+        <div class="legend-item">
+            <div class="legend-color" style="background:rgba(24, 144, 255, 0.2); border-color:#1890ff;"></div>
+            <span style="color:#1890ff;">未认领(25年已调查):</span>
+            <span class="count-badge" id="count-unclaimed-has" style="color:#1890ff;">0</span>
+        </div>
+        
+        <div class="legend-item">
+            <div class="legend-color" style="background:rgba(245, 34, 45, 0.2); border-color:#f5222d;"></div>
+            <span style="color:#f5222d;">未认领(25年未调查):</span>
+            <span class="count-badge" id="count-unclaimed-none" style="color:#f5222d;">0</span>
+        </div>
+
+        <div style="text-align:right; margin-top:10px;">
+            <span onclick="document.getElementById('legend-panel').style.display='none'; document.getElementById('legend-toggle-btn').style.display='block';" style="color:#666; cursor:pointer; font-size:12px; text-decoration:underline;">隐藏面板</span>
+        </div>
     </div>
+    <button id="legend-toggle-btn" onclick="document.getElementById('legend-panel').style.display='block'; this.style.display='none';">📊 显示状态看板</button>
+</div>
 
-    <script>
-        const FALLBACK_POINTS_GCJ02 = `\nhttps://uri.amap.com/marker?position=112.99539195,23.44267779&name=4401-001-01`;
-        const FALLBACK_POINTS_WGS84 = `(如需测试，请粘贴真实WGS84数据)`;
-        const birdSvgUri = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 50 10 C 20 10 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 10 50 10 Z' fill='%2387CEEB'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cellipse cx='75' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%235CACEE'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%235CACEE'/%3E%3C/svg%3E";
+<script>
+    const FALLBACK_POINTS_GCJ02 = `\nhttps://uri.amap.com/marker?position=112.99539195,23.44267779&name=4401-001-01`;
+    const FALLBACK_POINTS_WGS84 = `(如需测试，请粘贴真实WGS84数据)`;
+    const birdSvgUri = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 50 10 C 20 10 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 10 50 10 Z' fill='%2387CEEB'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cellipse cx='75' cy='52' rx='4' ry='2' fill='%23FFB6C1'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%235CACEE'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%235CACEE'/%3E%3C/svg%3E";
 
-        // 🌟 重新设计：温和治愈的“蜜桃粉”领航胖鸟 + 3根超明显带小黄豆的雷达呆毛
-        const myLocationSvgUri = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 45 20 Q 30 10 20 15' fill='none' stroke='%23333' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='20' cy='15' r='3' fill='%23FFD700'/%3E%3Cpath d='M 50 20 Q 50 5 50 2' fill='none' stroke='%23333' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='2' r='3' fill='%23FFD700'/%3E%3Cpath d='M 55 20 Q 70 10 80 15' fill='none' stroke='%23333' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='80' cy='15' r='3' fill='%23FFD700'/%3E%3Cpath d='M 50 20 C 20 20 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 20 50 20 Z' fill='%23FF9AA2'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='5' ry='3' fill='%23FF7F50'/%3E%3Cellipse cx='75' cy='52' rx='5' ry='3' fill='%23FF7F50'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%23FF7A85'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%23FF7A85'/%3E%3C/svg%3E";
+    // 🌟 重新设计：温和治愈的“蜜桃粉”领航胖鸟 + 3根超明显带小黄豆的雷达呆毛
+    const myLocationSvgUri = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='95' rx='20' ry='5' fill='rgba(0,0,0,0.2)'/%3E%3Cpath d='M 45 20 Q 30 10 20 15' fill='none' stroke='%23333' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='20' cy='15' r='3' fill='%23FFD700'/%3E%3Cpath d='M 50 20 Q 50 5 50 2' fill='none' stroke='%23333' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='2' r='3' fill='%23FFD700'/%3E%3Cpath d='M 55 20 Q 70 10 80 15' fill='none' stroke='%23333' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='80' cy='15' r='3' fill='%23FFD700'/%3E%3Cpath d='M 50 20 C 20 20 10 40 10 60 C 10 80 30 90 50 90 C 70 90 90 80 90 60 C 90 40 80 20 50 20 Z' fill='%23FF9AA2'/%3E%3Cpath d='M 50 45 C 30 45 20 60 20 75 C 20 85 35 90 50 90 C 65 90 80 85 80 75 C 80 60 70 45 50 45 Z' fill='%23FFFFFF'/%3E%3Ccircle cx='35' cy='45' r='4' fill='%23333333'/%3E%3Ccircle cx='65' cy='45' r='4' fill='%23333333'/%3E%3Cellipse cx='25' cy='52' rx='5' ry='3' fill='%23FF7F50'/%3E%3Cellipse cx='75' cy='52' rx='5' ry='3' fill='%23FF7F50'/%3E%3Cpath d='M 45 50 L 55 50 L 50 58 Z' fill='%23FFA500'/%3E%3Cpath d='M 15 50 C 5 50 5 70 15 65 Z' fill='%23FF7A85'/%3E%3Cpath d='M 85 50 C 95 50 95 70 85 65 Z' fill='%23FF7A85'/%3E%3C/svg%3E";
 
-        window.closeGlobalPopup = function() {
-            if (window.amapInstance) window.amapInstance.clearInfoWindow();
-            if (window.leafletInstance) window.leafletInstance.closePopup();
-        };
+    window.closeGlobalPopup = function() {
+        if (window.amapInstance) window.amapInstance.clearInfoWindow();
+        if (window.leafletInstance) window.leafletInstance.closePopup();
+    };
 
-        function updateLegendCounts() {
-            if (typeof GRID_INFO === 'undefined') return;
-            let doneHas2025 = 0, doneNo2025 = 0, todoHas2025 = 0, todoNo2025 = 0, unclaimHas2025 = 0, unclaimNo2025 = 0;
-            
-            Object.values(GRID_INFO).forEach(info => {
-                const status = info.status;
-                const hasInv2025 = info.inv2025 && info.inv2025 !== "无" && info.inv2025.trim() !== "";
-                if (status === '已完成' || status === '已调查') {
-                    if (hasInv2025) doneHas2025++; else doneNo2025++;
-                } else if (status === '待调查') {
-                    if (hasInv2025) todoHas2025++; else todoNo2025++;
-                } else if (status === '未认领') {
-                    if (hasInv2025) unclaimHas2025++; else unclaimNo2025++;
-                }
-            });
-            document.getElementById('count-done').innerText = `${doneHas2025} + ${doneNo2025}`;
-            document.getElementById('count-todo').innerText = `${todoHas2025} + ${todoNo2025}`;
-            document.getElementById('count-unclaimed-has').innerText = unclaimHas2025;
-            document.getElementById('count-unclaimed-none').innerText = unclaimNo2025;
+    function updateLegendCounts() {
+        if (typeof GRID_INFO === 'undefined') return;
+        let doneHas2025 = 0, doneNo2025 = 0, todoHas2025 = 0, todoNo2025 = 0, unclaimHas2025 = 0, unclaimNo2025 = 0;
+        
+        Object.values(GRID_INFO).forEach(info => {
+            const status = info.status;
+            const hasInv2025 = info.inv2025 && info.inv2025 !== "无" && info.inv2025.trim() !== "";
+            if (status === '已完成' || status === '已调查') {
+                if (hasInv2025) doneHas2025++; else doneNo2025++;
+            } else if (status === '待调查') {
+                if (hasInv2025) todoHas2025++; else todoNo2025++;
+            } else if (status === '未认领') {
+                if (hasInv2025) unclaimHas2025++; else unclaimNo2025++;
+            }
+        });
+        document.getElementById('count-done').innerText = `${doneHas2025} + ${doneNo2025}`;
+        document.getElementById('count-todo').innerText = `${todoHas2025} + ${todoNo2025}`;
+        document.getElementById('count-unclaimed-has').innerText = unclaimHas2025;
+        document.getElementById('count-unclaimed-none').innerText = unclaimNo2025;
 
-            // 🌟 读取并显示你在外部文件中定义的更新时间
-            const timeDisplay = document.getElementById('update-time-display');
-            if (typeof GRID_UP_TIME !== 'undefined') {
-                timeDisplay.innerText = `更新时间: ${GRID_UP_TIME}`;
-            } else {
-                timeDisplay.innerText = `更新时间: 暂无数据`;
+        // 🌟 读取并显示你在外部文件中定义的更新时间
+        const timeDisplay = document.getElementById('update-time-display');
+        if (typeof GRID_UP_TIME !== 'undefined') {
+            timeDisplay.innerText = `更新时间: ${GRID_UP_TIME}`;
+        } else {
+            timeDisplay.innerText = `更新时间: 暂无数据`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // ==========================================
+        // 🌟 核心：实时 GPS 定位与方向追踪系统 (终极极简稳定版)
+        // ==========================================
+        let locationWatchId = null;
+        let leafletLocationMarker = null;
+        let amapLocationMarker = null;
+        let currentCompassAngle = 0; // 累计角度，配合 CSS 解决 360 度反转抽搐
+
+        function wgs84togcj02(lng, lat) {
+            const a = 6378245.0, ee = 0.00669342162296594323, PI = Math.PI;
+            if (lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271) return [lng, lat];
+            let dLat = transformLat(lng - 105.0, lat - 35.0);
+            let dLng = transformLng(lng - 105.0, lat - 35.0);
+            const radLat = lat / 180.0 * PI;
+            let magic = Math.sin(radLat);
+            magic = 1 - ee * magic * magic;
+            const sqrtMagic = Math.sqrt(magic);
+            dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * PI);
+            dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI);
+            return [lng + dLng, lat + dLat];
+        }
+        function transformLat(x, y) {
+            let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+            ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+            ret += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
+            ret += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0; return ret;
+        }
+        function transformLng(x, y) {
+            let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+            ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+            ret += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
+            ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0; return ret;
+        }
+
+        // 🌟 纯净指南针读取
+        function handleDeviceOrientation(event) {
+            let heading = null;
+            if (event.webkitCompassHeading !== undefined) {
+                heading = event.webkitCompassHeading; // iOS 设备
+            } else if (event.absolute === true && event.alpha !== null) {
+                heading = 360 - event.alpha; // Android 设备
+            }
+
+            if (heading !== null) {
+                // 核心：计算最短旋转路径，彻底解决 359->1 时的原地乱转
+                let diff = heading - (currentCompassAngle % 360);
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+                currentCompassAngle += diff;
+
+                // 把平滑工作交给底层 CSS 的 transition 去做
+                document.querySelectorAll('.dir-arrow-layer').forEach(el => {
+                    el.style.transform = `rotate(${currentCompassAngle}deg)`;
+                });
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // ==========================================
-            // 🌟 核心：实时 GPS 定位与方向追踪系统 (终极极简稳定版)
-            // ==========================================
-            let locationWatchId = null;
-            let leafletLocationMarker = null;
-            let amapLocationMarker = null;
-            let currentCompassAngle = 0; // 累计角度，配合 CSS 解决 360 度反转抽搐
+        // 动态生成雷达 HTML
+        function getDirectionalBirdHtml(size) {
+            return `
+            <div style="position:relative; width:${size}px; height:${size}px;">
+                <!-- 🌟 这里的 transition:transform 0.4s ease-out 是防抖和顺滑的核心 -->
+                <div class="dir-arrow-layer" style="position:absolute; top:-35%; left:-35%; width:170%; height:170%; transform:rotate(${currentCompassAngle}deg); transition:transform 0.4s ease-out; z-index:1;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="rgba(255,154,162,0.15)" stroke="#FF9AA2" stroke-width="2.5" stroke-dasharray="6,4"/>
+                        <path d="M 50 3 C 40 18 45 28 50 28 C 55 28 60 18 50 3 Z" fill="#FF4500" stroke="#FFF" stroke-width="1.5"/>
+                        <path d="M 50 28 L 50 18" fill="none" stroke="#FFF" stroke-width="1.5"/>
+                    </svg>
+                </div>
+                <img src="${myLocationSvgUri}" style="width:${size}px; height:${size}px; position:absolute; top:0; left:0; z-index:2; pointer-events:none;">
+            </div>`;
+        }
 
-            function wgs84togcj02(lng, lat) {
-                const a = 6378245.0, ee = 0.00669342162296594323, PI = Math.PI;
-                if (lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271) return [lng, lat];
-                let dLat = transformLat(lng - 105.0, lat - 35.0);
-                let dLng = transformLng(lng - 105.0, lat - 35.0);
-                const radLat = lat / 180.0 * PI;
-                let magic = Math.sin(radLat);
-                magic = 1 - ee * magic * magic;
-                const sqrtMagic = Math.sqrt(magic);
-                dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * PI);
-                dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI);
-                return [lng + dLng, lat + dLat];
-            }
-            function transformLat(x, y) {
-                let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
-                ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
-                ret += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
-                ret += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0; return ret;
-            }
-            function transformLng(x, y) {
-                let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
-                ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
-                ret += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
-                ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0; return ret;
+        // ==========================================
+        // 🌟 将定位功能封装为独立函数，供右上角面板调用
+        // ==========================================
+        window.startGpsTracking = function() {
+            if (!navigator.geolocation) return alert("您的浏览器不支持 GPS 定位！");
+
+            if ('ondeviceorientationabsolute' in window) {
+                window.addEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
+            } else if (window.DeviceOrientationEvent) {
+                window.addEventListener("deviceorientation", handleDeviceOrientation, true);
             }
 
-            // 🌟 纯净指南针读取
-            function handleDeviceOrientation(event) {
-                let heading = null;
-                if (event.webkitCompassHeading !== undefined) {
-                    heading = event.webkitCompassHeading; // iOS 设备
-                } else if (event.absolute === true && event.alpha !== null) {
-                    heading = 360 - event.alpha; // Android 设备
+            locationWatchId = navigator.geolocation.watchPosition((position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const wgs84LatLng = [lat, lng];
+                const gcj02Coords = wgs84togcj02(lng, lat);
+
+                // 👇 新增这行，保存最后一次获取到的位置供靶心跳转使用
+                window.lastGpsCoords = { wgs84: wgs84LatLng, gcj02: gcj02Coords };
+
+                // 更新开源地图
+                if (window.leafletInstance) {
+                    let size = Math.max(20, Math.min(Math.round(25 + (window.leafletInstance.getZoom() - 10) * 1.5), 50));
+                    const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
+
+                    if (!leafletLocationMarker) {
+                        leafletLocationMarker = L.marker([gcj02Coords[1], gcj02Coords[0]], {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
+                        leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
+                    } else {
+                        leafletLocationMarker.setLatLng([gcj02Coords[1], gcj02Coords[0]]);
+                        leafletLocationMarker.setIcon(myDivIcon);
+                    }
                 }
 
-                if (heading !== null) {
-                    // 核心：计算最短旋转路径，彻底解决 359->1 时的原地乱转
-                    let diff = heading - (currentCompassAngle % 360);
-                    if (diff > 180) diff -= 360;
-                    if (diff < -180) diff += 360;
-                    currentCompassAngle += diff;
-
-                    // 把平滑工作交给底层 CSS 的 transition 去做
-                    document.querySelectorAll('.dir-arrow-layer').forEach(el => {
-                        el.style.transform = `rotate(${currentCompassAngle}deg)`;
-                    });
+                // 更新高德地图
+                if (window.amapInstance) {
+                    let size = Math.max(20, Math.min(Math.round(25 + (window.amapInstance.getZoom() - 10) * 1.5), 50));
+                    if (!amapLocationMarker) {
+                        amapLocationMarker = new window.AMap.Marker({
+                            position: gcj02Coords, content: getDirectionalBirdHtml(size),
+                            offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
+                        });
+                        //amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
+                    } else {
+                        amapLocationMarker.setPosition(gcj02Coords);
+                        amapLocationMarker.setContent(getDirectionalBirdHtml(size));
+                        amapLocationMarker.setOffset(new window.AMap.Pixel(-size/2, -size));
+                    }
                 }
-            }
-
-            // 动态生成雷达 HTML
-            function getDirectionalBirdHtml(size) {
-                return `
-                <div style="position:relative; width:${size}px; height:${size}px;">
-                    <!-- 🌟 这里的 transition:transform 0.4s ease-out 是防抖和顺滑的核心 -->
-                    <div class="dir-arrow-layer" style="position:absolute; top:-35%; left:-35%; width:170%; height:170%; transform:rotate(${currentCompassAngle}deg); transition:transform 0.4s ease-out; z-index:1;">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="45" fill="rgba(255,154,162,0.15)" stroke="#FF9AA2" stroke-width="2.5" stroke-dasharray="6,4"/>
-                            <path d="M 50 3 C 40 18 45 28 50 28 C 55 28 60 18 50 3 Z" fill="#FF4500" stroke="#FFF" stroke-width="1.5"/>
-                            <path d="M 50 28 L 50 18" fill="none" stroke="#FFF" stroke-width="1.5"/>
-                        </svg>
-                    </div>
-                    <img src="${myLocationSvgUri}" style="width:${size}px; height:${size}px; position:absolute; top:0; left:0; z-index:2; pointer-events:none;">
-                </div>`;
-            }
-
-            // ==========================================
-            // 🌟 将定位功能封装为独立函数，供右上角面板调用
-            // ==========================================
-            window.startGpsTracking = function() {
-                if (!navigator.geolocation) return alert("您的浏览器不支持 GPS 定位！");
-
-                if ('ondeviceorientationabsolute' in window) {
-                    window.addEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
-                } else if (window.DeviceOrientationEvent) {
-                    window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+            }, (err) => {
+                console.warn("GPS 获取失败:", err);
+                // 🌟 如果定位失败，自动取消右上角面板的打钩
+                if (window.leafletInstance && window.gpsLayer) {
+                    window.leafletInstance.removeLayer(window.gpsLayer);
                 }
+                if (err.code === 1) alert("定位失败：您拒绝了网页获取位置的权限。");
+            }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 });
+        };
 
-                locationWatchId = navigator.geolocation.watchPosition((position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    const wgs84LatLng = [lat, lng];
-                    const gcj02Coords = wgs84togcj02(lng, lat);
+        window.stopGpsTracking = function() {
+            if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId);
+            window.removeEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
+            window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
 
-                    // 👇 新增这行，保存最后一次获取到的位置供靶心跳转使用
-                    window.lastGpsCoords = { wgs84: wgs84LatLng, gcj02: gcj02Coords };
+            if (leafletLocationMarker) { window.leafletInstance.removeLayer(leafletLocationMarker); leafletLocationMarker = null; }
+            if (amapLocationMarker) { window.amapInstance.remove(amapLocationMarker); amapLocationMarker = null; }
+        };
 
-                    // 更新开源地图
-                    if (window.leafletInstance) {
-                        let size = Math.max(20, Math.min(Math.round(25 + (window.leafletInstance.getZoom() - 10) * 1.5), 50));
-                        const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
+        const sidebar = document.getElementById('sidebar');
+        const dataInput = document.getElementById('data-input');
+        const amapKeysDiv = document.getElementById('amap-keys');
+        
+        updateLegendCounts();
 
-                        if (!leafletLocationMarker) {
-                            leafletLocationMarker = L.marker([gcj02Coords[1], gcj02Coords[0]], {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
-                            leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
-                        } else {
-                            leafletLocationMarker.setLatLng([gcj02Coords[1], gcj02Coords[0]]);
-                            leafletLocationMarker.setIcon(myDivIcon);
-                        }
-                    }
-
-                    // 更新高德地图
-                    if (window.amapInstance) {
-                        let size = Math.max(20, Math.min(Math.round(25 + (window.amapInstance.getZoom() - 10) * 1.5), 50));
-                        if (!amapLocationMarker) {
-                            amapLocationMarker = new window.AMap.Marker({
-                                position: gcj02Coords, content: getDirectionalBirdHtml(size),
-                                offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
-                            });
-                            //amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
-                        } else {
-                            amapLocationMarker.setPosition(gcj02Coords);
-                            amapLocationMarker.setContent(getDirectionalBirdHtml(size));
-                            amapLocationMarker.setOffset(new window.AMap.Pixel(-size/2, -size));
-                        }
-                    }
-                }, (err) => {
-                    console.warn("GPS 获取失败:", err);
-                    // 🌟 如果定位失败，自动取消右上角面板的打钩
-                    if (window.leafletInstance && window.gpsLayer) {
-                        window.leafletInstance.removeLayer(window.gpsLayer);
-                    }
-                    if (err.code === 1) alert("定位失败：您拒绝了网页获取位置的权限。");
-                }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 });
-            };
-
-            window.stopGpsTracking = function() {
-                if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId);
-                window.removeEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
-                window.removeEventListener("deviceorientation", handleDeviceOrientation, true);
-
-                if (leafletLocationMarker) { window.leafletInstance.removeLayer(leafletLocationMarker); leafletLocationMarker = null; }
-                if (amapLocationMarker) { window.amapInstance.remove(amapLocationMarker); amapLocationMarker = null; }
-            };
-
-            const sidebar = document.getElementById('sidebar');
-            const dataInput = document.getElementById('data-input');
-            const amapKeysDiv = document.getElementById('amap-keys');
-            
-            updateLegendCounts();
-
-            document.getElementById('toggle-btn').addEventListener('click', function() {
-                sidebar.classList.toggle('collapsed');
-                this.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
-            });
+        document.getElementById('toggle-btn').addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            this.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+        });
 
 //            document.querySelectorAll('input[name="engine"]').forEach(radio => {
 //                radio.addEventListener('change', (e) => {
@@ -432,120 +464,121 @@
 //                });
 //            });
 
-            document.querySelectorAll('input[name="engine"]').forEach(radio => {
-                radio.addEventListener('change', (e) => {
-                    const isAmap = e.target.value === 'amap';
-                    amapKeysDiv.style.display = isAmap ? 'block' : 'none';
-                    // 🌟 统一使用 GCJ02 火星坐标数据
-                    dataInput.value = typeof POINTS_GCJ02 !== 'undefined' ? POINTS_GCJ02.trim() : FALLBACK_POINTS_GCJ02.trim();
-                });
+        document.querySelectorAll('input[name="engine"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const isAmap = e.target.value === 'amap';
+                amapKeysDiv.style.display = isAmap ? 'block' : 'none';
+                // 🌟 统一使用 GCJ02 火星坐标数据
+                dataInput.value = typeof POINTS_GCJ02 !== 'undefined' ? POINTS_GCJ02.trim() : FALLBACK_POINTS_GCJ02.trim();
             });
+        });
 
-            // 初始化默认填充文本框
-            dataInput.value = typeof POINTS_GCJ02 !== 'undefined' ? POINTS_GCJ02.trim() : FALLBACK_POINTS_GCJ02.trim();
+        // 初始化默认填充文本框
+        dataInput.value = typeof POINTS_GCJ02 !== 'undefined' ? POINTS_GCJ02.trim() : FALLBACK_POINTS_GCJ02.trim();
 
-            //dataInput.value = typeof POINTS_WGS84 !== 'undefined' ? POINTS_WGS84.trim() : FALLBACK_POINTS_WGS84.trim();
-            document.getElementById('api-key').value = localStorage.getItem('amap_key') || '';
-            document.getElementById('sec-key').value = localStorage.getItem('amap_sec') || '';
+        //dataInput.value = typeof POINTS_WGS84 !== 'undefined' ? POINTS_WGS84.trim() : FALLBACK_POINTS_WGS84.trim();
+        document.getElementById('api-key').value = localStorage.getItem('amap_key') || '';
+        document.getElementById('sec-key').value = localStorage.getItem('amap_sec') || '';
 
-            window.amapInstance = null;
-            window.leafletInstance = null;
+        window.amapInstance = null;
+        window.leafletInstance = null;
 
-            function generateGridPopupHtml(title, sColor, sText, info) {
-                let inv2025 = info ? (info.inv2025 || "无") : "无";
-                let inv2026 = info ? (info.inv2026 || "无") : "无";
-                let rec2026 = info ? (info.rec2026 || "无") : "无";
-                let date = info ? (info.date || "") : "";
-                let dateHtml = (info && (info.status === '已完成' || info.status === '已调查' || info.status === '待调查') && date) ? `<div><span style="color:#888;">调查日期：</span> ${date}</div>` : "";
-                return `
-                    <div style="position:relative; width: 250px; box-sizing: border-box; padding:12px 18px 12px 16px; background:rgba(255, 255, 255, 0.95); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); backdrop-filter:blur(6px); font-family: sans-serif;">
-                        <div class="custom-close-btn" onclick="window.closeGlobalPopup()">×</div>
-                        <div style="font-size:16px; font-weight:bold; color:#333; margin-bottom:6px; border-bottom:1px solid #ddd; padding-bottom:6px; padding-right:15px;">
-                            🔲 区域网格: <span style="color:#1890ff;">${title}</span>
-                        </div>
-                        <div style="font-size:14px; font-weight:bold; color:${sColor}; margin-bottom:10px;">${sText}</div>
-                        <div style="font-size:13px; color:#444; line-height:1.7;">
-                            <div><span style="color:#888;">25年调查员：</span> ${inv2025}</div>
-                            <div><span style="color:#888;">26年调查员：</span> ${inv2026}</div>
-                            <div><span style="color:#888;">26年记录员：</span> ${rec2026}</div>
-                            ${dateHtml}
-                        </div>
+        function generateGridPopupHtml(title, sColor, sText, info) {
+            let inv2025 = info ? (info.inv2025 || "无") : "无";
+            let inv2026 = info ? (info.inv2026 || "无") : "无";
+            let rec2026 = info ? (info.rec2026 || "无") : "无";
+            let date = info ? (info.date || "") : "";
+            let dateHtml = (info && (info.status === '已完成' || info.status === '已调查' || info.status === '待调查') && date) ? `<div><span style="color:#888;">调查日期：</span> ${date}</div>` : "";
+            return `
+                <!-- <div style="position:relative; width: 250px; box-sizing: border-box; padding:12px 18px 12px 16px; background:rgba(255, 255, 255, 0.4); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); backdrop-filter:blur(6px); font-family: sans-serif;"> -->
+                <div style="position:relative; width: 250px; box-sizing: border-box; padding:12px 18px 12px 16px; background:rgba(255, 255, 255, 0.65); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); font-family: sans-serif;">
+                    <div class="custom-close-btn" onclick="window.closeGlobalPopup()">×</div>
+                    <div style="font-size:16px; font-weight:bold; color:#333; margin-bottom:6px; border-bottom:1px solid #ddd; padding-bottom:6px; padding-right:15px;">
+                        🔲 区域网格: <span style="color:#1890ff;">${title}</span>
                     </div>
-                `;
-            }
+                    <div style="font-size:14px; font-weight:bold; color:${sColor}; margin-bottom:10px;">${sText}</div>
+                    <div style="font-size:13px; color:#444; line-height:1.7;">
+                        <div><span style="color:#888;">25年调查员：</span> ${inv2025}</div>
+                        <div><span style="color:#888;">26年调查员：</span> ${inv2026}</div>
+                        <div><span style="color:#888;">26年记录员：</span> ${rec2026}</div>
+                        ${dateHtml}
+                    </div>
+                </div>
+            `;
+        }
 
-            // 🌟 升级：样点信息卡片 (加入获取高德GCJ02坐标并生成跳转链接的逻辑)
-            function generatePointPopupHtml(title, lng, lat) {
-                // 1. 从内置的 POINTS_GCJ02 文本中匹配出该点最原始的高德坐标
-                let amapLng = lng, amapLat = lat;
-                if (typeof POINTS_GCJ02 !== 'undefined') {
-                    const lines = POINTS_GCJ02.split('\n');
-                    for (let line of lines) {
-                        const match = line.trim().match(/position=([\d\.]+),([\d\.]+)&name=(.*)/);
-                        if (match && decodeURIComponent(match[3]) === title) {
-                            amapLng = match[1];
-                            amapLat = match[2];
-                            break;
-                        }
+        // 🌟 升级：样点信息卡片 (加入获取高德GCJ02坐标并生成跳转链接的逻辑)
+        function generatePointPopupHtml(title, lng, lat) {
+            // 1. 从内置的 POINTS_GCJ02 文本中匹配出该点最原始的高德坐标
+            let amapLng = lng, amapLat = lat;
+            if (typeof POINTS_GCJ02 !== 'undefined') {
+                const lines = POINTS_GCJ02.split('\n');
+                for (let line of lines) {
+                    const match = line.trim().match(/position=([\d\.]+),([\d\.]+)&name=(.*)/);
+                    if (match && decodeURIComponent(match[3]) === title) {
+                        amapLng = match[1];
+                        amapLat = match[2];
+                        break;
                     }
                 }
-
-                // 2. 生成高德 URI 跳转链接
-                // src=mypage 表示来源，callnative=1 尝试强行唤醒高德APP
-                const viewUrl = `https://uri.amap.com/marker?position=${amapLng},${amapLat}&name=${encodeURIComponent(title)}&src=mypage&callnative=1`;
-                // 导航链接，终点定为该坐标，起点为空则高德自动定位当前位置
-                const navUrl = `https://uri.amap.com/navigation?to=${amapLng},${amapLat},${encodeURIComponent(title)}&mode=car&src=mypage&callnative=1`;
-
-                return `
-                    <div style="position:relative; width: 250px; box-sizing: border-box; padding:12px 18px 12px 16px; background:rgba(255, 255, 255, 0.95); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); backdrop-filter:blur(6px); font-family: sans-serif;">
-                        <div class="custom-close-btn" onclick="window.closeGlobalPopup()">×</div>
-                        <div style="font-size:16px; font-weight:bold; color:#333; margin-bottom:6px; border-bottom:1px solid #ddd; padding-bottom:6px; padding-right:15px;">
-                            <img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:4px;">样点: <span style="color:#1890ff;">${title}</span>
-                        </div>
-                        <div style="font-size:13px; color:#444; line-height:1.7;">
-                            <div style="margin-bottom:4px;"><span style="color:#888;">经度(Lng)：</span> ${lng}</div>
-                            <div style="margin-bottom:8px;"><span style="color:#888;">纬度(Lat)：</span> ${lat}</div>
-                        </div>
-                        <!-- 🌟 新增：高德快捷操作按钮区 -->
-                        <div style="display:flex; gap:8px; margin-top:10px;">
-                            <a href="${viewUrl}" target="_blank" style="flex:1; text-align:center; padding:6px 0; background:#e6f7ff; color:#1890ff; text-decoration:none; font-size:12px; font-weight:bold; border-radius:4px; border:1px solid #91d5ff;">🗺️ 高德查看</a>
-                            <a href="${navUrl}" target="_blank" style="flex:1; text-align:center; padding:6px 0; background:#1890ff; color:#fff; text-decoration:none; font-size:12px; font-weight:bold; border-radius:4px; border:1px solid #1890ff;">🚗 一键导航</a>
-                        </div>
-                    </div>
-                `;
             }
 
-            document.getElementById('render-btn').addEventListener('click', () => {
-                const engine = document.querySelector('input[name="engine"]:checked').value;
-                const text = dataInput.value.trim();
+            // 2. 生成高德 URI 跳转链接
+            // src=mypage 表示来源，callnative=1 尝试强行唤醒高德APP
+            const viewUrl = `https://uri.amap.com/marker?position=${amapLng},${amapLat}&name=${encodeURIComponent(title)}&src=mypage&callnative=1`;
+            // 导航链接，终点定为该坐标，起点为空则高德自动定位当前位置
+            const navUrl = `https://uri.amap.com/navigation?to=${amapLng},${amapLat},${encodeURIComponent(title)}&mode=car&src=mypage&callnative=1`;
+
+            return `
+                <div style="position:relative; width: 250px; box-sizing: border-box; padding:12px 18px 12px 16px; background:rgba(255, 255, 255, 0.95); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); backdrop-filter:blur(6px); font-family: sans-serif;">
+                    <div class="custom-close-btn" onclick="window.closeGlobalPopup()">×</div>
+                    <div style="font-size:16px; font-weight:bold; color:#333; margin-bottom:6px; border-bottom:1px solid #ddd; padding-bottom:6px; padding-right:15px;">
+                        <img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:4px;">样点: <span style="color:#1890ff;">${title}</span>
+                    </div>
+                    <div style="font-size:13px; color:#444; line-height:1.7;">
+                        <div style="margin-bottom:4px;"><span style="color:#888;">经度(Lng)：</span> ${lng}</div>
+                        <div style="margin-bottom:8px;"><span style="color:#888;">纬度(Lat)：</span> ${lat}</div>
+                    </div>
+                    <!-- 🌟 新增：高德快捷操作按钮区 -->
+                    <div style="display:flex; gap:8px; margin-top:10px;">
+                        <a href="${viewUrl}" target="_blank" style="flex:1; text-align:center; padding:6px 0; background:#e6f7ff; color:#1890ff; text-decoration:none; font-size:12px; font-weight:bold; border-radius:4px; border:1px solid #91d5ff;">🗺️ 高德查看</a>
+                        <a href="${navUrl}" target="_blank" style="flex:1; text-align:center; padding:6px 0; background:#1890ff; color:#fff; text-decoration:none; font-size:12px; font-weight:bold; border-radius:4px; border:1px solid #1890ff;">🚗 一键导航</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        document.getElementById('render-btn').addEventListener('click', () => {
+            const engine = document.querySelector('input[name="engine"]:checked').value;
+            const text = dataInput.value.trim();
+            
+            if (!text || text === FALLBACK_POINTS_WGS84) {
+                return alert("请输入或粘贴真实的点位URL数据！");
+            }
+
+            if (window.innerWidth <= 768) {
+                sidebar.classList.add('collapsed');
+                document.getElementById('toggle-btn').innerText = '▶';
+            }
+
+            document.getElementById('amap-container').classList.toggle('active', engine === 'amap');
+            document.getElementById('leaflet-container').classList.toggle('active', engine === 'osm');
+
+            if (engine === 'amap') renderAmap(text);
+            else renderLeaflet(text);
+        });
+
+        // ==========================================
+        // 引擎 1：开源 Leaflet (CartoDB 默认 + OSM 备用)
+        // ==========================================
+        let lMarkers = L.featureGroup(), lPolygons = L.featureGroup(), lLabels = L.featureGroup();
+
+        function renderLeaflet(text) {
+            if (!window.leafletInstance) {
+                //window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5 }).setView([23.1291, 113.2644], 10);
+                //window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
+                window.leafletInstance = L.map('leaflet-container', { zoomControl: false, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
                 
-                if (!text || text === FALLBACK_POINTS_WGS84) {
-                    return alert("请输入或粘贴真实的点位URL数据！");
-                }
-
-                if (window.innerWidth <= 768) {
-                    sidebar.classList.add('collapsed');
-                    document.getElementById('toggle-btn').innerText = '▶';
-                }
-
-                document.getElementById('amap-container').classList.toggle('active', engine === 'amap');
-                document.getElementById('leaflet-container').classList.toggle('active', engine === 'osm');
-
-                if (engine === 'amap') renderAmap(text);
-                else renderLeaflet(text);
-            });
-
-            // ==========================================
-            // 引擎 1：开源 Leaflet (CartoDB 默认 + OSM 备用)
-            // ==========================================
-            let lMarkers = L.featureGroup(), lPolygons = L.featureGroup(), lLabels = L.featureGroup();
-
-            function renderLeaflet(text) {
-                if (!window.leafletInstance) {
-                    //window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5 }).setView([23.1291, 113.2644], 10);
-                    //window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
-                    window.leafletInstance = L.map('leaflet-container', { zoomControl: false, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
-                    
 //                    // 🌟 更换 CartoDB 高速街道图作为默认底图
 //                    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' });
 //                    
@@ -566,49 +599,56 @@
 //                        { collapsed: false }
 //                    ).addTo(window.leafletInstance);
 
-                    // 🌟 利用高德直连瓦片 URL (免Key，国内秒开)
-                    // style=7 是标准路线图，style=6 是纯卫星图，style=8 是透明路网注记图
-                    const amapNormal = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
-                    const amapSatellite = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
-                    const amapLabels = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
+                // 🌟 利用高德直连瓦片 URL (免Key，国内秒开)
+                // style=7 是标准路线图，style=6 是纯卫星图，style=8 是透明路网注记图
+                const amapNormal = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
+                const amapSatellite = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
+                const amapLabels = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}', { maxZoom: 19, subdomains: ['1','2','3','4'] });
 
-                    // 将卫星和注记组合
-                    const amapSatWithLabels = L.layerGroup([amapSatellite, amapLabels]);
+                // 将卫星和注记组合
+                const amapSatWithLabels = L.layerGroup([amapSatellite, amapLabels]);
 
-                    // 默认开启高德卫星图
-                    // amapNormal.addTo(window.leafletInstance);
-                    amapSatellite.addTo(window.leafletInstance);
+                // 默认开启高德卫星图
+                // amapNormal.addTo(window.leafletInstance);
+                amapSatellite.addTo(window.leafletInstance);
 
-                    window.gpsLayer = L.layerGroup();
+                window.gpsLayer = L.layerGroup();
 
-                    L.control.layers(
-                        { "🗺️ 标准图": amapNormal, "🛰️ 卫星图": amapSatellite },
-                        { "🛣️ 路网": amapLabels,
-                          [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:1px; margin-top:-2px;"> 样点图标`]: lMarkers,
-                          "🎯 实时定位": window.gpsLayer
-                        },
-                        { collapsed: false }
-                    ).addTo(window.leafletInstance);
+                L.control.layers(
+                    { "🗺️ 标准图": amapNormal, "🛰️ 卫星图": amapSatellite },
+                    { "🛣️ 路网": amapLabels,
+                        [`<img src="${birdSvgUri}" style="width:16px; vertical-align:middle; margin-right:1px; margin-top:-2px;"> 样点图标`]: lMarkers,
+                        //"🎯 实时定位": window.gpsLayer
+                    },
+                    { collapsed: false }
+                ).addTo(window.leafletInstance);
 
-                    // 🌟 动态向右上角面板插入上下折叠箭头
+                // 🌟 修复：多端强制绑定事件，彻底解决无法点击问题
                     setTimeout(() => {
                         const layerControl = document.querySelector('.leaflet-control-layers');
                         if (layerControl && !document.getElementById('layer-collapse-arrow')) {
                             const arrow = document.createElement('div');
                             arrow.id = 'layer-collapse-arrow';
-                            arrow.innerHTML = '▲';
-                            arrow.style.cssText = 'text-align:center; cursor:pointer; padding:4px 0; border-bottom:1px solid #eee; margin-bottom:6px; color:#1890ff; font-size:16px; font-weight:900;';
+                            arrow.innerHTML = '▲ 收起选项';
+                            arrow.style.cssText = 'text-align:center; cursor:pointer; padding:4px 0; border-bottom:1px solid #ddd; margin-bottom:6px; color:#1890ff; font-size:13px; font-weight:bold;';
 
                             const form = layerControl.querySelector('form');
                             layerControl.insertBefore(arrow, form);
 
+                            if(window.L) L.DomEvent.disableClickPropagation(arrow);
+
                             let isExpanded = true;
-                            arrow.onclick = function(e) {
+                            const toggleAction = function(e) {
                                 e.stopPropagation();
+                                e.preventDefault(); // 强制截断底层默认事件
                                 isExpanded = !isExpanded;
                                 form.style.display = isExpanded ? 'block' : 'none';
-                                arrow.innerHTML = isExpanded ? '▲' : '▼';
+                                arrow.innerHTML = isExpanded ? '▲ 收起选项' : '▼ 展开选项';
                             };
+
+                            // 同时监听鼠标点击和手机触摸，绝不漏掉任何操作
+                            arrow.addEventListener('click', toggleAction);
+                            arrow.addEventListener('touchstart', toggleAction, {passive: false});
                         }
                     }, 200);
 
@@ -750,6 +790,38 @@
             }
 
             function executeAmapRender(text) {
+                const amapControl = document.createElement('div');
+                    amapControl.innerHTML = `
+                        <div id="amap-custom-control" style="position:absolute; top: 10px; right: 10px; z-index: 999; padding: 12px;">
+                            <div id="amap-collapse-arrow" style="text-align:center; cursor:pointer; padding-bottom:6px; border-bottom:1px solid #ddd; margin-bottom:8px; color:#1890ff; font-size:13px; font-weight:bold;">▲ 收起选项</div>
+                            <div id="amap-control-form">
+                                <label style="display:flex; align-items:center; cursor:pointer; font-size:13px; font-weight:bold; color:#1890ff; margin-bottom:8px;">
+                                    <input type="checkbox" id="amap-toggle-marker" checked style="margin-right:6px;"> 🐦 显示样点图标
+                                </label>
+                                <label style="display:flex; align-items:center; cursor:pointer; font-size:12px; color:#666; margin:0;" title="部分浏览器自带纠偏，若定位偏移请取消">
+                                    <input type="checkbox" id="amap-fix-offset" checked style="margin-right:6px;"> 🔧 纠正定位偏移
+                                </label>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('amap-container').appendChild(amapControl.firstElementChild);
+
+
+                    let amapExpanded = true;
+                    const amapArrow = document.getElementById('amap-collapse-arrow');
+                    
+                    const toggleAmapAction = function(e) {
+                        e.stopPropagation(); 
+                        e.preventDefault(); // 强制截断底层默认事件
+                        amapExpanded = !amapExpanded;
+                        document.getElementById('amap-control-form').style.display = amapExpanded ? 'block' : 'none';
+                        amapArrow.innerHTML = amapExpanded ? '▲ 收起选项' : '▼ 展开选项';
+                    };
+                    
+                    // 同时监听鼠标点击和手机触摸
+                    amapArrow.addEventListener('click', toggleAmapAction);
+                    amapArrow.addEventListener('touchstart', toggleAmapAction, {passive: false});
+
                 if (!window.amapInstance) {
                     window.amapInstance = new window.AMap.Map('amap-container', { zoom: 10, center: [113.2644, 23.1291] });
                     window.amapInstance.addControl(new window.AMap.MapType({ defaultType: 1, showTraffic: false, showRoad: false }));
@@ -965,11 +1037,13 @@
             });
 
             // ==========================================
-            // 🌟 联动系统：无极缩放滑块 & 靶心回归定位
+            // 🌟 联动系统：无极缩放滑块 & 靶心回归定位开关
             // ==========================================
             const zoomSlider = document.getElementById('zoom-slider');
+            const locateBtn = document.getElementById('locate-btn');
+            let isTrackingActive = false; // 记录靶心状态
 
-            // 1. 拖动滑块 -> 缩放地图
+            // 1. 滑块控制缩放
             zoomSlider.addEventListener('input', (e) => {
                 const zLevel = parseFloat(e.target.value);
                 if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
@@ -980,33 +1054,36 @@
                 }
             });
 
-            // 2. 双击或捏合缩放地图 -> 自动更新滑块位置
-            // (注意：Leaflet 端请在 window.leafletInstance.on('zoomend') 里面加一句：zoomSlider.value = window.leafletInstance.getZoom();)
-            // (高德 端请在 window.amapInstance.on('zoomchange') 里面加一句：zoomSlider.value = window.amapInstance.getZoom();)
+            // 2. 点击靶心 -> 开启/关闭定位
+            locateBtn.addEventListener('click', () => {
+                isTrackingActive = !isTrackingActive;
 
-            // 3. 点击靶心 -> 自动开启定位(如果没开) -> 飞回定位并放大
-            document.getElementById('locate-btn').addEventListener('click', () => {
-                const locToggle = document.getElementById('toggle-location');
-                if (!locToggle.checked) {
-                    locToggle.click(); // 如果没开定位，自动帮你打钩开启
+                if (isTrackingActive) {
+                    // 🔵 开启定位：按钮变蓝，调用核心定位函数
+                    locateBtn.style.background = '#1890ff';
+                    locateBtn.style.borderColor = '#1890ff';
+                    window.startGpsTracking(); // (调用我们之前写好的全局定位函数)
+
+                    // 稍等获取到信号后，自动拉近并飞跃到当前位置
+                    setTimeout(() => {
+                        if (window.lastGpsCoords) {
+                            zoomSlider.value = 16.5;
+                            if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
+                                window.leafletInstance.flyTo(window.lastGpsCoords.wgs84, 16.5, { duration: 1.5 });
+                            }
+                            if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
+                                window.amapInstance.setZoomAndCenter(16.5, window.lastGpsCoords.gcj02);
+                            }
+                        } else {
+                            alert("正在搜索卫星信号，请稍候...");
+                        }
+                    }, 600);
+                } else {
+                    // ⚪ 关闭定位：按钮恢复白色，停止追踪
+                    locateBtn.style.background = 'rgba(255,255,255,0.9)';
+                    locateBtn.style.borderColor = '#ccc';
+                    window.stopGpsTracking();
                 }
-
-                // 给 GPS 留一点获取信号的时间
-                setTimeout(() => {
-                    if (window.lastGpsCoords) {
-                        zoomSlider.value = 16.5; // 自动放大到能看清小路的级别
-
-                        if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
-                            // 带有丝滑飞跃动画的视角切换
-                            window.leafletInstance.flyTo(window.lastGpsCoords.wgs84, 16.5, { duration: 1.5 });
-                        }
-                        if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
-                            window.amapInstance.setZoomAndCenter(16.5, window.lastGpsCoords.gcj02);
-                        }
-                    } else {
-                        alert("正在努力搜索卫星信号，请稍等两秒再点一次🎯...");
-                    }
-                }, 600);
             });
 
         });
