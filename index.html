@@ -24,8 +24,9 @@
     }
 
     #sidebar.collapsed { margin-left: -350px; }
+    /* 🌟 将侧边栏按钮大幅向下调整至 85% */
     #toggle-btn {
-        position: absolute; right: -28px; top: 65%; transform: translateY(-50%);
+        position: absolute; right: -28px; top: 85%; transform: translateY(-50%);
         width: 28px; height: 60px; background: #fff; border: 1px solid #ddd;
         border-left: none; border-radius: 0 8px 8px 0; cursor: pointer;
         display: flex; align-items: center; justify-content: center;
@@ -131,8 +132,8 @@
 
     /* 🌟 统一右侧所有悬浮面板的透明度和磨砂玻璃效果 */
         .leaflet-control-layers, #amap-custom-control, #custom-map-tools, #legend-panel {
-            background: rgba(255, 255, 255, 0.6) !important; /* 80% 透明度 */
-            /* backdrop-filter: blur(8px) !important; */
+            background: rgba(255, 255, 255, 0.8) !important; /* 80% 透明度 */
+            backdrop-filter: blur(8px) !important;/
             -webkit-backdrop-filter: blur(8px) !important;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
             border: none !important;
@@ -159,6 +160,10 @@
             background: #fff; border: 2px solid #1890ff; border-radius: 50%;
             cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
         }
+
+    /* 🌟 给独立的折叠按钮留出位置 */
+    .leaflet-top.leaflet-right .leaflet-control-layers { margin-top: 45px !important; }
+
 </style>
 </head>
 <body>
@@ -223,6 +228,9 @@
 
     <div id="leaflet-container" class="map-layer active"></div>
     <div id="amap-container" class="map-layer"></div>
+
+    <!-- 🌟 独立于地图引擎之外的折叠按钮，绝对不会失效 -->
+        <div id="custom-leaflet-toggle" style="display:none; position:absolute; top:10px; right:10px; z-index:1000; background:rgba(255,255,255,0.65); padding:8px 12px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); color:#1890ff; font-weight:bold; font-size:13px; cursor:pointer;">▲ 收起选项</div>
 
     <div id="legend-panel">
         <div style="font-weight:bold; text-align:center; font-size:14px; color:#333; padding-bottom:4px;">📊 网格状态看板</div>
@@ -376,8 +384,10 @@
         }
 
         // ==========================================
-        // 🌟 将定位功能封装为独立函数，供右上角面板调用
+        // 🌟 核心：定位追踪与精准靶心回归 (无纠偏开关版)
         // ==========================================
+        let isTrackingActive = false; // 记录靶心状态
+
         window.startGpsTracking = function() {
             if (!navigator.geolocation) return alert("您的浏览器不支持 GPS 定位！");
 
@@ -390,47 +400,53 @@
             locationWatchId = navigator.geolocation.watchPosition((position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
+
+                // 1. 硬件获取的原生坐标永远是 WGS84（给开源地图用）
                 const wgs84LatLng = [lat, lng];
-                const gcj02Coords = wgs84togcj02(lng, lat);
 
-                // 👇 新增这行，保存最后一次获取到的位置供靶心跳转使用
-                window.lastGpsCoords = { wgs84: wgs84LatLng, gcj02: gcj02Coords };
+                // 2. 强制转换出 GCJ02 坐标（给高德地图用）
+                const amapCoords = wgs84togcj02(lng, lat);
 
-                // 更新开源地图
+                // 全局保存最新坐标，供点击“靶心”时调用
+                window.lastGpsCoords = { wgs84: wgs84LatLng, amap: amapCoords };
+
+                // 更新开源地图定位鸟
                 if (window.leafletInstance) {
                     let size = Math.max(20, Math.min(Math.round(25 + (window.leafletInstance.getZoom() - 10) * 1.5), 50));
                     const myDivIcon = L.divIcon({ html: getDirectionalBirdHtml(size), className: '', iconSize: [size, size], iconAnchor: [size/2, size] });
 
                     if (!leafletLocationMarker) {
-                        leafletLocationMarker = L.marker([gcj02Coords[1], gcj02Coords[0]], {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
+                        leafletLocationMarker = L.marker(wgs84LatLng, {icon: myDivIcon, zIndexOffset: 1000}).addTo(window.leafletInstance);
                         leafletLocationMarker.bindTooltip("🎯 我在这里", {direction: 'top', offset: [0, -size/2], className: 'hover-tooltip'});
                     } else {
-                        leafletLocationMarker.setLatLng([gcj02Coords[1], gcj02Coords[0]]);
+                        leafletLocationMarker.setLatLng(wgs84LatLng);
                         leafletLocationMarker.setIcon(myDivIcon);
                     }
                 }
 
-                // 更新高德地图
+                // 更新高德地图定位鸟
                 if (window.amapInstance) {
                     let size = Math.max(20, Math.min(Math.round(25 + (window.amapInstance.getZoom() - 10) * 1.5), 50));
                     if (!amapLocationMarker) {
                         amapLocationMarker = new window.AMap.Marker({
-                            position: gcj02Coords, content: getDirectionalBirdHtml(size),
+                            position: amapCoords, content: getDirectionalBirdHtml(size),
                             offset: new window.AMap.Pixel(-size/2, -size), zIndex: 1000, map: window.amapInstance
                         });
-                        //amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
+                        amapLocationMarker.setLabel({ content: "🎯 我在这里", direction: 'top' });
                     } else {
-                        amapLocationMarker.setPosition(gcj02Coords);
+                        amapLocationMarker.setPosition(amapCoords);
                         amapLocationMarker.setContent(getDirectionalBirdHtml(size));
                         amapLocationMarker.setOffset(new window.AMap.Pixel(-size/2, -size));
                     }
                 }
             }, (err) => {
                 console.warn("GPS 获取失败:", err);
-                // 🌟 如果定位失败，自动取消右上角面板的打钩
-                if (window.leafletInstance && window.gpsLayer) {
-                    window.leafletInstance.removeLayer(window.gpsLayer);
+                const locateBtn = document.getElementById('locate-btn');
+                if(locateBtn) {
+                    locateBtn.style.background = 'rgba(255,255,255,0.65)';
+                    locateBtn.style.borderColor = '#ccc';
                 }
+                isTrackingActive = false;
                 if (err.code === 1) alert("定位失败：您拒绝了网页获取位置的权限。");
             }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 });
         };
@@ -443,6 +459,7 @@
             if (leafletLocationMarker) { window.leafletInstance.removeLayer(leafletLocationMarker); leafletLocationMarker = null; }
             if (amapLocationMarker) { window.amapInstance.remove(amapLocationMarker); amapLocationMarker = null; }
         };
+
 
         const sidebar = document.getElementById('sidebar');
         const dataInput = document.getElementById('data-input');
@@ -490,8 +507,7 @@
             let date = info ? (info.date || "") : "";
             let dateHtml = (info && (info.status === '已完成' || info.status === '已调查' || info.status === '待调查') && date) ? `<div><span style="color:#888;">调查日期：</span> ${date}</div>` : "";
             return `
-                <!-- <div style="position:relative; width: 250px; box-sizing: border-box; padding:12px 18px 12px 16px; background:rgba(255, 255, 255, 0.4); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); backdrop-filter:blur(6px); font-family: sans-serif;"> -->
-                <div style="position:relative; width: 250px; box-sizing: border-box; padding:12px 18px 12px 16px; background:rgba(255, 255, 255, 0.65); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); font-family: sans-serif;">
+                <div style="position:relative; width: 250px; box-sizing: border-box; padding:12px 18px 12px 16px; background:rgba(255, 255, 255, 0.95); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); backdrop-filter:blur(6px); font-family: sans-serif;">
                     <div class="custom-close-btn" onclick="window.closeGlobalPopup()">×</div>
                     <div style="font-size:16px; font-weight:bold; color:#333; margin-bottom:6px; border-bottom:1px solid #ddd; padding-bottom:6px; padding-right:15px;">
                         🔲 区域网格: <span style="color:#1890ff;">${title}</span>
@@ -623,34 +639,22 @@
                     { collapsed: false }
                 ).addTo(window.leafletInstance);
 
-                // 🌟 修复：多端强制绑定事件，彻底解决无法点击问题
-                    setTimeout(() => {
+                // 🌟 启用外部的、永远不会被摧毁的折叠按钮
+                    const leafToggle = document.getElementById('custom-leaflet-toggle');
+                    leafToggle.style.display = 'block';
+
+                    let leafExpanded = true;
+                    // 克隆节点以防止重复绑定事件
+                    const newLeafToggle = leafToggle.cloneNode(true);
+                    leafToggle.parentNode.replaceChild(newLeafToggle, leafToggle);
+
+                    newLeafToggle.addEventListener('click', (e) => {
+                        e.stopPropagation(); e.preventDefault();
+                        leafExpanded = !leafExpanded;
                         const layerControl = document.querySelector('.leaflet-control-layers');
-                        if (layerControl && !document.getElementById('layer-collapse-arrow')) {
-                            const arrow = document.createElement('div');
-                            arrow.id = 'layer-collapse-arrow';
-                            arrow.innerHTML = '▲ 收起选项';
-                            arrow.style.cssText = 'text-align:center; cursor:pointer; padding:4px 0; border-bottom:1px solid #ddd; margin-bottom:6px; color:#1890ff; font-size:13px; font-weight:bold;';
-
-                            const form = layerControl.querySelector('form');
-                            layerControl.insertBefore(arrow, form);
-
-                            if(window.L) L.DomEvent.disableClickPropagation(arrow);
-
-                            let isExpanded = true;
-                            const toggleAction = function(e) {
-                                e.stopPropagation();
-                                e.preventDefault(); // 强制截断底层默认事件
-                                isExpanded = !isExpanded;
-                                form.style.display = isExpanded ? 'block' : 'none';
-                                arrow.innerHTML = isExpanded ? '▲ 收起选项' : '▼ 展开选项';
-                            };
-
-                            // 同时监听鼠标点击和手机触摸，绝不漏掉任何操作
-                            arrow.addEventListener('click', toggleAction);
-                            arrow.addEventListener('touchstart', toggleAction, {passive: false});
-                        }
-                    }, 200);
+                        if (layerControl) layerControl.style.display = leafExpanded ? 'block' : 'none';
+                        newLeafToggle.innerHTML = leafExpanded ? '▲ 收起选项' : '▼ 展开选项';
+                    });
 
                     // 🌟 监听右上角面板的打钩事件，调用定位函数
                     window.leafletInstance.on('overlayadd', (e) => {
@@ -791,6 +795,7 @@
 
             function executeAmapRender(text) {
                 const amapControl = document.createElement('div');
+                document.getElementById('custom-leaflet-toggle').style.display = 'none';
                     amapControl.innerHTML = `
                         <div id="amap-custom-control" style="position:absolute; top: 10px; right: 10px; z-index: 999; padding: 12px;">
                             <div id="amap-collapse-arrow" style="text-align:center; cursor:pointer; padding-bottom:6px; border-bottom:1px solid #ddd; margin-bottom:8px; color:#1890ff; font-size:13px; font-weight:bold;">▲ 收起选项</div>
@@ -1037,55 +1042,58 @@
             });
 
             // ==========================================
-            // 🌟 联动系统：无极缩放滑块 & 靶心回归定位开关
+            // 🌟 绑定右侧边栏的：无极缩放滑块 & 靶心按钮
             // ==========================================
             const zoomSlider = document.getElementById('zoom-slider');
             const locateBtn = document.getElementById('locate-btn');
-            let isTrackingActive = false; // 记录靶心状态
 
-            // 1. 滑块控制缩放
-            zoomSlider.addEventListener('input', (e) => {
-                const zLevel = parseFloat(e.target.value);
-                if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
-                    window.leafletInstance.setZoom(zLevel);
-                }
-                if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
-                    window.amapInstance.setZoom(zLevel);
-                }
-            });
+            if (zoomSlider) {
+                zoomSlider.addEventListener('input', (e) => {
+                    const zLevel = parseFloat(e.target.value);
+                    if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
+                        window.leafletInstance.setZoom(zLevel);
+                    }
+                    if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
+                        window.amapInstance.setZoom(zLevel);
+                    }
+                });
+            }
 
-            // 2. 点击靶心 -> 开启/关闭定位
-            locateBtn.addEventListener('click', () => {
-                isTrackingActive = !isTrackingActive;
+            // 点击靶心 -> 开启定位并飞越聚焦
+            if (locateBtn) {
+                locateBtn.addEventListener('click', () => {
+                    isTrackingActive = !isTrackingActive;
 
-                if (isTrackingActive) {
-                    // 🔵 开启定位：按钮变蓝，调用核心定位函数
-                    locateBtn.style.background = '#1890ff';
-                    locateBtn.style.borderColor = '#1890ff';
-                    window.startGpsTracking(); // (调用我们之前写好的全局定位函数)
+                    if (isTrackingActive) {
+                        locateBtn.style.background = '#1890ff';
+                        locateBtn.style.borderColor = '#1890ff';
+                        window.startGpsTracking();
 
-                    // 稍等获取到信号后，自动拉近并飞跃到当前位置
-                    setTimeout(() => {
-                        if (window.lastGpsCoords) {
-                            zoomSlider.value = 16.5;
-                            if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
-                                window.leafletInstance.flyTo(window.lastGpsCoords.wgs84, 16.5, { duration: 1.5 });
+                        setTimeout(() => {
+                            if (window.lastGpsCoords) {
+                                if (zoomSlider) zoomSlider.value = 16.5;
+                                if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
+                                    window.leafletInstance.flyTo(window.lastGpsCoords.wgs84, 16.5, { duration: 1.5 });
+                                }
+                                if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
+                                    window.amapInstance.setZoomAndCenter(16.5, window.lastGpsCoords.amap);
+                                }
+                            } else {
+                                alert("正在搜索卫星信号，请稍等两秒再点一次🎯...");
                             }
-                            if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
-                                window.amapInstance.setZoomAndCenter(16.5, window.lastGpsCoords.gcj02);
-                            }
-                        } else {
-                            alert("正在搜索卫星信号，请稍候...");
-                        }
-                    }, 600);
-                } else {
-                    // ⚪ 关闭定位：按钮恢复白色，停止追踪
-                    locateBtn.style.background = 'rgba(255,255,255,0.9)';
-                    locateBtn.style.borderColor = '#ccc';
-                    window.stopGpsTracking();
-                }
-            });
+                        }, 600);
+                    } else {
+                        locateBtn.style.background = 'rgba(255,255,255,0.65)';
+                        locateBtn.style.borderColor = '#ccc';
 
+                        // 同步取消高德面板上的定位打钩（如果你还保留了的话）
+                        const amapLocBox = document.getElementById('amap-toggle-location');
+                        if (amapLocBox) amapLocBox.checked = false;
+
+                        window.stopGpsTracking();
+                    }
+                });
+            }
         });
     </script>
 </body>
