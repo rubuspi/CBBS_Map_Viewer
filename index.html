@@ -225,7 +225,7 @@
     <!-- 🌟 右侧居中的无极缩放滑块与靶心定位按钮 -->
         <div id="custom-map-tools" style="position:absolute; right:15px; top:50%; transform:translateY(-50%); z-index:1000; display:flex; flex-direction:column; align-items:center; padding:12px 8px;">
             <!-- 滑动条 -->
-            <input type="range" id="zoom-slider" min="5" max="19" step="0.1" value="10" title="拖动无极缩放">
+            <input type="range" id="zoom-slider" min="7" max="17" step="0.1" value="10" title="拖动缩放">
 
             <!-- 🌟 靶点按钮 (兼具 开启/关闭 定位功能) -->
             <div id="locate-btn" title="开启/关闭实时定位" style="margin-top:15px; cursor:pointer; font-size:18px; width:34px; height:34px; background:rgba(255,255,255,0.9); color:#333; border: 2px solid #ccc; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:0.3s;">
@@ -1049,58 +1049,59 @@
             });
 
             // ==========================================
-            // 🌟 绑定右侧边栏的：无极缩放滑块 & 靶心按钮
-            // ==========================================
-            const zoomSlider = document.getElementById('zoom-slider');
-            const locateBtn = document.getElementById('locate-btn');
+        // 🌟 绑定右侧边栏：滑块 & 靶心 (仅作单次聚焦使用)
+        // ==========================================
+        const zoomSlider = document.getElementById('zoom-slider');
+        const locateBtn = document.getElementById('locate-btn');
 
-            if (zoomSlider) {
-                zoomSlider.addEventListener('input', (e) => {
-                    const zLevel = parseFloat(e.target.value);
+        if (zoomSlider) {
+            zoomSlider.addEventListener('input', (e) => {
+                const zLevel = parseFloat(e.target.value);
+                if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
+                    window.leafletInstance.setZoom(zLevel);
+                }
+                if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
+                    window.amapInstance.setZoom(zLevel);
+                }
+            });
+        }
+
+        if (locateBtn) {
+            locateBtn.addEventListener('click', () => {
+                if (!navigator.geolocation) return alert("您的浏览器不支持 GPS 定位！");
+
+                // 点击时给一个变蓝的视觉反馈，0.2秒后恢复
+                locateBtn.style.background = '#e6f7ff';
+                setTimeout(() => locateBtn.style.background = 'rgba(255,255,255,0.9)', 200);
+
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+
+                    // 硬件获取的 WGS84 转换为 GCJ02 火星坐标 (高德底图必须用这个)
+                    const gcj02Coords = wgs84togcj02(lng, lat); // 返回格式: [经度, 纬度]
+
+                    // 🌟 修复定位跑到最上方的问题：Leaflet 需要 [纬度, 经度] 格式！
+                    const leafletGcj02 = [gcj02Coords[1], gcj02Coords[0]];
+
+                    if (zoomSlider) zoomSlider.value = 16.5;
+
                     if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
-                        window.leafletInstance.setZoom(zLevel);
+                        // 开源地图 丝滑飞越并聚焦
+                        window.leafletInstance.flyTo(leafletGcj02, 16.5, { duration: 1.5 });
                     }
                     if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
-                        window.amapInstance.setZoom(zLevel);
+                        // 高德地图 瞬间聚焦
+                        window.amapInstance.setZoomAndCenter(16.5, gcj02Coords);
                     }
-                });
-            }
+                }, (err) => {
+                    console.warn("GPS 获取失败:", err);
+                    if (err.code === 1) alert("定位失败：您拒绝了网页获取位置的权限。");
+                    else alert("定位获取失败，请检查手机定位服务是否开启，或稍后再试。");
+                }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+            });
+        }
 
-            // 点击靶心 -> 开启定位并飞越聚焦
-            if (locateBtn) {
-                locateBtn.addEventListener('click', () => {
-                    isTrackingActive = !isTrackingActive;
-
-                    if (isTrackingActive) {
-                        locateBtn.style.background = '#1890ff';
-                        locateBtn.style.borderColor = '#1890ff';
-                        window.startGpsTracking();
-
-                        setTimeout(() => {
-                            if (window.lastGpsCoords) {
-                                if (zoomSlider) zoomSlider.value = 16.5;
-                                if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
-                                    window.leafletInstance.flyTo(window.lastGpsCoords.wgs84, 16.5, { duration: 1.5 });
-                                }
-                                if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
-                                    window.amapInstance.setZoomAndCenter(16.5, window.lastGpsCoords.amap);
-                                }
-                            } else {
-                                //alert("正在搜索卫星信号，请稍等两秒再点一次🎯...");
-                            }
-                        }, 600);
-                    } else {
-                        locateBtn.style.background = 'rgba(255,255,255,0.65)';
-                        locateBtn.style.borderColor = '#ccc';
-
-                        // 同步取消高德面板上的定位打钩（如果你还保留了的话）
-                        const amapLocBox = document.getElementById('amap-toggle-location');
-                        if (amapLocBox) amapLocBox.checked = false;
-
-                        window.stopGpsTracking();
-                    }
-                });
-            }
         });
     </script>
 </body>
