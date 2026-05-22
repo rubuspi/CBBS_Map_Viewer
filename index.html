@@ -102,16 +102,31 @@
             .textarea-wrapper { min-height: 100px; max-height: 250px; } 
             #toggle-btn { right: -24px; width: 24px; height: 48px; font-size: 12px; }
 
-            /* 🌟 新增：强制将左上角的缩放按钮挪到屏幕右侧靠中间的位置 🌟 */
-            .leaflet-top.leaflet-left .leaflet-control-zoom {
-                position: fixed !important;
-                top: 50% !important;
-                left: auto !important;
-                right: 15px !important;
-                transform: translateY(-50%) !important;
-                margin: 0 !important;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
-            }
+        }
+
+        /* 🌟 隐藏开源地图原生自带的 +/- 缩放按钮 */
+        .leaflet-control-zoom { display: none !important; }
+
+        /* 🌟 垂直无极缩放滑块的专属样式 */
+        #zoom-slider {
+            -webkit-appearance: slider-vertical;
+            writing-mode: bt-lr;
+            width: 6px;
+            height: 140px;
+            cursor: pointer;
+            outline: none;
+            background: #ddd;
+            border-radius: 4px;
+        }
+        #zoom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            background: #fff;
+            border: 2px solid #1890ff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
         }
     </style>
 </head>
@@ -163,6 +178,17 @@
     </div>
     
     <div id="map-wrapper">
+        <!-- 🌟 新增：靠右居中的无极缩放滑块与靶心定位按钮 -->
+        <div id="custom-map-tools" style="position:absolute; right:15px; top:50%; transform:translateY(-50%); z-index:1000; display:flex; flex-direction:column; align-items:center; background:rgba(255,255,255,0.9); padding:12px 8px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.2); backdrop-filter:blur(4px);">
+            <!-- 滑动条 (范围5~19级，支持小数级无缝缩放) -->
+            <input type="range" id="zoom-slider" min="5" max="19" step="0.1" value="10" title="拖动无极缩放">
+
+            <!-- 靶点按钮 -->
+            <div id="locate-btn" title="回到我的定位" style="margin-top:15px; cursor:pointer; font-size:18px; width:34px; height:34px; background:#1890ff; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.3); transition:0.2s;">
+                🎯
+            </div>
+        </div>
+
         <div id="leaflet-container" class="map-layer active"></div>
         <div id="amap-container" class="map-layer"></div>
 
@@ -334,6 +360,9 @@
                     const lng = position.coords.longitude;
                     const wgs84LatLng = [lat, lng];
                     const gcj02Coords = wgs84togcj02(lng, lat);
+
+                    // 👇 新增这行，保存最后一次获取到的位置供靶心跳转使用
+                    window.lastGpsCoords = { wgs84: wgs84LatLng, gcj02: gcj02Coords };
 
                     // 更新开源地图
                     if (window.leafletInstance) {
@@ -514,7 +543,8 @@
             function renderLeaflet(text) {
                 if (!window.leafletInstance) {
                     //window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5 }).setView([23.1291, 113.2644], 10);
-                    window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
+                    //window.leafletInstance = L.map('leaflet-container', { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
+                    window.leafletInstance = L.map('leaflet-container', { zoomControl: false, zoomSnap: 0.25, zoomDelta: 0.5, attributionControl: false }).setView([23.1291, 113.2644], 10);
                     
 //                    // 🌟 更换 CartoDB 高速街道图作为默认底图
 //                    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' });
@@ -560,6 +590,28 @@
                         { collapsed: false }
                     ).addTo(window.leafletInstance);
 
+                    // 🌟 动态向右上角面板插入上下折叠箭头
+                    setTimeout(() => {
+                        const layerControl = document.querySelector('.leaflet-control-layers');
+                        if (layerControl && !document.getElementById('layer-collapse-arrow')) {
+                            const arrow = document.createElement('div');
+                            arrow.id = 'layer-collapse-arrow';
+                            arrow.innerHTML = '▲';
+                            arrow.style.cssText = 'text-align:center; cursor:pointer; padding:4px 0; border-bottom:1px solid #eee; margin-bottom:6px; color:#1890ff; font-size:16px; font-weight:900;';
+
+                            const form = layerControl.querySelector('form');
+                            layerControl.insertBefore(arrow, form);
+
+                            let isExpanded = true;
+                            arrow.onclick = function(e) {
+                                e.stopPropagation();
+                                isExpanded = !isExpanded;
+                                form.style.display = isExpanded ? 'block' : 'none';
+                                arrow.innerHTML = isExpanded ? '▲' : '▼';
+                            };
+                        }
+                    }, 200);
+
                     // 🌟 监听右上角面板的打钩事件，调用定位函数
                     window.leafletInstance.on('overlayadd', (e) => {
                         if (e.name === "🎯 实时定位") window.startGpsTracking();
@@ -578,6 +630,8 @@
                             icon.options.popupAnchor = [0, -newSize];
                             marker.setIcon(icon);
                         });
+
+                        document.getElementById('zoom-slider').value = window.leafletInstance.getZoom();
                     });
                 }
 
@@ -706,6 +760,8 @@
                         let size = Math.max(12, Math.min(Math.round(20 + (window.amapInstance.getZoom() - 10) * 1.5), 45));
                         const newIcon = new window.AMap.Icon({ size: new window.AMap.Size(size, size), image: birdSvgUri, imageSize: new window.AMap.Size(size, size) });
                         aMarkers.forEach(m => { m.setIcon(newIcon); m.setOffset(new window.AMap.Pixel(-size/2, -size)); });
+
+                        document.getElementById('zoom-slider').value = window.amapInstance.getZoom();
                     });
                 } else {
                     window.amapInstance.remove(aMarkers); window.amapInstance.remove(aPolygons); window.amapInstance.remove(aLabels);
@@ -906,6 +962,51 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
+            });
+
+            // ==========================================
+            // 🌟 联动系统：无极缩放滑块 & 靶心回归定位
+            // ==========================================
+            const zoomSlider = document.getElementById('zoom-slider');
+
+            // 1. 拖动滑块 -> 缩放地图
+            zoomSlider.addEventListener('input', (e) => {
+                const zLevel = parseFloat(e.target.value);
+                if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
+                    window.leafletInstance.setZoom(zLevel);
+                }
+                if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
+                    window.amapInstance.setZoom(zLevel);
+                }
+            });
+
+            // 2. 双击或捏合缩放地图 -> 自动更新滑块位置
+            // (注意：Leaflet 端请在 window.leafletInstance.on('zoomend') 里面加一句：zoomSlider.value = window.leafletInstance.getZoom();)
+            // (高德 端请在 window.amapInstance.on('zoomchange') 里面加一句：zoomSlider.value = window.amapInstance.getZoom();)
+
+            // 3. 点击靶心 -> 自动开启定位(如果没开) -> 飞回定位并放大
+            document.getElementById('locate-btn').addEventListener('click', () => {
+                const locToggle = document.getElementById('toggle-location');
+                if (!locToggle.checked) {
+                    locToggle.click(); // 如果没开定位，自动帮你打钩开启
+                }
+
+                // 给 GPS 留一点获取信号的时间
+                setTimeout(() => {
+                    if (window.lastGpsCoords) {
+                        zoomSlider.value = 16.5; // 自动放大到能看清小路的级别
+
+                        if (window.leafletInstance && document.getElementById('leaflet-container').classList.contains('active')) {
+                            // 带有丝滑飞跃动画的视角切换
+                            window.leafletInstance.flyTo(window.lastGpsCoords.wgs84, 16.5, { duration: 1.5 });
+                        }
+                        if (window.amapInstance && document.getElementById('amap-container').classList.contains('active')) {
+                            window.amapInstance.setZoomAndCenter(16.5, window.lastGpsCoords.gcj02);
+                        }
+                    } else {
+                        alert("正在努力搜索卫星信号，请稍等两秒再点一次🎯...");
+                    }
+                }, 600);
             });
 
         });
