@@ -1,8 +1,8 @@
-// GitHub 机器人自动同步时间: 2026-05-23 10:00:03
-const GRID_UP_TIME = '2026-05-23 10:00:03';
+// GitHub 机器人自动同步时间: 2026-05-23 11:00:02
+const GRID_UP_TIME = '2026-05-23 11:00:02';
 const GRID_INFO = {
     "1": {
-        "status": "待调查",
+        "status": "已完成",
         "coordinator": "陈培涛(小PT)",
         "inv2025": "",
         "inv2026": "陈培涛",
@@ -74,7 +74,7 @@ const GRID_INFO = {
         "date": "2026年4月25日"
     },
     "10": {
-        "status": "待调查",
+        "status": "已完成",
         "coordinator": "蔡振远(阿暖)",
         "inv2025": "崔润田",
         "inv2026": "崔润田",
@@ -322,7 +322,7 @@ const GRID_INFO = {
         "date": ""
     },
     "41": {
-        "status": "待调查",
+        "status": "已完成",
         "coordinator": "蔡振远(阿暖)",
         "inv2025": "梁周子涵",
         "inv2026": "简鹏飞",
@@ -594,7 +594,7 @@ const GRID_INFO = {
         "date": "2026年5月3日"
     },
     "75": {
-        "status": "待调查",
+        "status": "已完成",
         "coordinator": "姚彩红(鸺鹠)",
         "inv2025": "",
         "inv2026": "罗海燕",
@@ -626,7 +626,7 @@ const GRID_INFO = {
         "date": ""
     },
     "79": {
-        "status": "待调查",
+        "status": "已完成",
         "coordinator": "姚彩红(鸺鹠)",
         "inv2025": "",
         "inv2026": "谢海莹",
@@ -634,7 +634,7 @@ const GRID_INFO = {
         "date": "2026年5月23日"
     },
     "80": {
-        "status": "待调查",
+        "status": "已完成",
         "coordinator": "姚彩红(鸺鹠)",
         "inv2025": "",
         "inv2026": "姚彩红",
